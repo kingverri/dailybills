@@ -1,0 +1,722 @@
+"use client";
+
+import { CalendarDays, ChevronDown, ChevronUp, ClipboardList, Pencil, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { PageHeader } from "@/components/page-header";
+import { platforms, weeklySettlementDays } from "@/lib/constants";
+import {
+  calculateDriverLogMetrics,
+  calculateWeeklyDriverSummaryForRange,
+  getWeekRangeBySettlementDay
+} from "@/lib/financeCalculations";
+import {
+  buildDriverLogExportRows,
+  exportToCSV,
+  exportToXLSX
+} from "@/lib/exportUtils";
+import {
+  formatCurrency,
+  formatDate,
+  formatDurationFromDecimalHours,
+  formatHourlyRate,
+  formatTime12Hour,
+  toDateInputValue
+} from "@/lib/format";
+import { settlementDayLabel, t } from "@/lib/i18n";
+import {
+  canAddDriverLog,
+  canUseWeeklyHistory,
+  canUseWeeklySettlement,
+  getCurrentMonthDriverLogCount,
+  getCurrentPlan
+} from "@/lib/planLimits";
+import { getSupabaseClient } from "@/lib/supabase";
+import { useAuth } from "@/components/auth-provider";
+import type { DriverLog, PaySchedule, Platform, WeeklySettlementDay } from "@/types/app";
+
+type DriverLogForm = {
+  date: string;
+  platform: Platform;
+  start_time: string;
+  end_time: string;
+  miles_driven: string;
+  gross_earnings: string;
+  gas_spent: string;
+  gas_price_per_gallon: string;
+  extra_expenses: string;
+  extra_expense_notes: string;
+  notes: string;
+};
+
+type ExportFormat = "csv" | "xlsx" | "google";
+
+const initialForm: DriverLogForm = {
+  date: toDateInputValue(),
+  platform: "DoorDash",
+  start_time: "",
+  end_time: "",
+  miles_driven: "",
+  gross_earnings: "",
+  gas_spent: "",
+  gas_price_per_gallon: "",
+  extra_expenses: "",
+  extra_expense_notes: "",
+  notes: ""
+};
+
+function dayOfWeekToSettlementDay(day?: string | null): WeeklySettlementDay | null {
+  const value = day?.toLowerCase();
+  return weeklySettlementDays.find((item) => item === value) ?? null;
+}
+
+function timeForInput(time?: string | null) {
+  return time ? time.slice(0, 5) : "";
+}
+
+export default function DriverLogPage() {
+  const { user, profile, refreshProfile } = useAuth();
+  const [logs, setLogs] = useState<DriverLog[]>([]);
+  const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
+  const [form, setForm] = useState<DriverLogForm>(initialForm);
+  const [settlementDay, setSettlementDay] = useState<WeeklySettlementDay>("friday");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [showCurrentFullSummary, setShowCurrentFullSummary] = useState(false);
+  const [showPreviousFullSummary, setShowPreviousFullSummary] = useState(false);
+  const [detailWeek, setDetailWeek] = useState<"current" | "previous" | null>(null);
+  const [exportStartDate, setExportStartDate] = useState(toDateInputValue());
+  const [exportEndDate, setExportEndDate] = useState(toDateInputValue());
+  const [exportError, setExportError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savingSettlement, setSavingSettlement] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const language = profile?.language ?? "en";
+  const currency = profile?.currency ?? "USD";
+  const currentPlan = getCurrentPlan(profile);
+  const monthlyDriverLogCount = useMemo(() => getCurrentMonthDriverLogCount(logs), [logs]);
+  const canCreateDriverLog = canAddDriverLog(currentPlan, monthlyDriverLogCount);
+  const canChangeSettlementDay = canUseWeeklySettlement(currentPlan);
+  const canViewWeeklyHistory = canUseWeeklyHistory(currentPlan);
+  const gross = Number(form.gross_earnings || 0);
+  const miles = Number(form.miles_driven || 0);
+  const gasSpent = Number(form.gas_spent || 0);
+  const gasPrice = Number(form.gas_price_per_gallon || 0);
+  const extraExpenses = Number(form.extra_expenses || 0);
+  const preview = useMemo(
+    () =>
+      calculateDriverLogMetrics({
+        start_time: form.start_time || null,
+        end_time: form.end_time || null,
+        miles_driven: miles,
+        gross_earnings: gross,
+        gas_spent: gasSpent,
+        gas_price_per_gallon: gasPrice,
+        extra_expenses: extraExpenses
+      }),
+    [extraExpenses, form.end_time, form.start_time, gasPrice, gasSpent, gross, miles]
+  );
+  const currentWeekRange = useMemo(() => getWeekRangeBySettlementDay(new Date(), settlementDay), [settlementDay]);
+  const previousWeekRange = useMemo(() => {
+    const previousAnchor = new Date(currentWeekRange.start);
+    previousAnchor.setDate(previousAnchor.getDate() - 1);
+    return getWeekRangeBySettlementDay(previousAnchor, settlementDay);
+  }, [currentWeekRange.start, settlementDay]);
+  const currentWeekSummary = useMemo(
+    () => calculateWeeklyDriverSummaryForRange(logs, currentWeekRange),
+    [currentWeekRange, logs]
+  );
+  const previousWeekSummary = useMemo(
+    () => calculateWeeklyDriverSummaryForRange(logs, previousWeekRange),
+    [logs, previousWeekRange]
+  );
+  const currentWeekLogs = useMemo(
+    () =>
+      logs.filter((log) => log.date >= currentWeekRange.startDate && log.date <= currentWeekRange.endDate),
+    [currentWeekRange.endDate, currentWeekRange.startDate, logs]
+  );
+  const previousWeekLogs = useMemo(
+    () =>
+      logs.filter((log) => log.date >= previousWeekRange.startDate && log.date <= previousWeekRange.endDate),
+    [previousWeekRange.endDate, previousWeekRange.startDate, logs]
+  );
+  const selectedWeekLogs = detailWeek === "previous" ? previousWeekLogs : currentWeekLogs;
+
+  async function loadData() {
+    if (!user) {
+      return;
+    }
+
+    setLoading(true);
+    const supabase = getSupabaseClient();
+    const [logResult, scheduleResult] = await Promise.all([
+      supabase.from("driver_logs").select("*").eq("user_id", user.id).order("date", { ascending: false }),
+      supabase.from("pay_schedules").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
+    ]);
+
+    if (logResult.error || scheduleResult.error) {
+      setError(logResult.error?.message ?? scheduleResult.error?.message ?? "");
+    } else {
+      setLogs(logResult.data ?? []);
+      setPaySchedules(scheduleResult.data ?? []);
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadData().catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  useEffect(() => {
+    const weeklyScheduleDay = dayOfWeekToSettlementDay(
+      paySchedules.find((schedule) => schedule.schedule_type === "weekly")?.day_of_week
+    );
+    setSettlementDay(profile?.weekly_settlement_day ?? weeklyScheduleDay ?? "friday");
+  }, [paySchedules, profile?.weekly_settlement_day]);
+
+  function resetForm() {
+    setForm(initialForm);
+    setEditingId(null);
+    setError("");
+  }
+
+  function editLog(log: DriverLog) {
+    setEditingId(log.id);
+    setShowForm(true);
+    setForm({
+      date: log.date,
+      platform: log.platform,
+      start_time: timeForInput(log.start_time),
+      end_time: timeForInput(log.end_time),
+      miles_driven: String(log.miles_driven),
+      gross_earnings: String(log.gross_earnings),
+      gas_spent: String(log.gas_spent),
+      gas_price_per_gallon: String(log.gas_price_per_gallon),
+      extra_expenses: String(log.extra_expenses),
+      extra_expense_notes: log.extra_expense_notes ?? "",
+      notes: log.notes ?? ""
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function saveSettlementDay(nextDay: WeeklySettlementDay) {
+    setSettlementDay(nextDay);
+    setError("");
+    setMessage("");
+
+    if (!user) {
+      setError(t(language, "loginAgain"));
+      return;
+    }
+
+    setSavingSettlement(true);
+    const supabase = getSupabaseClient();
+    const { error: saveError } = await supabase
+      .from("profiles")
+      .upsert({ user_id: user.id, weekly_settlement_day: nextDay }, { onConflict: "user_id" });
+    setSavingSettlement(false);
+
+    if (saveError) {
+      setError(saveError.message);
+      return;
+    }
+
+    await refreshProfile();
+    setMessage(t(language, "settlementSaved"));
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+
+    if (!user) {
+      setError(t(language, "loginAgain"));
+      return;
+    }
+
+    if (!editingId && !canCreateDriverLog) {
+      setError(t(language, "freeDriverLogLimitMessage"));
+      return;
+    }
+
+    if (
+      !form.date ||
+      !form.platform ||
+      !form.start_time ||
+      !form.end_time ||
+      !Number.isFinite(miles) ||
+      miles < 0 ||
+      !Number.isFinite(gross) ||
+      gross < 0 ||
+      !Number.isFinite(gasSpent) ||
+      gasSpent < 0 ||
+      !Number.isFinite(gasPrice) ||
+      gasPrice < 0 ||
+      !Number.isFinite(extraExpenses) ||
+      extraExpenses < 0 ||
+      (gasSpent > 0 && gasPrice <= 0)
+    ) {
+      setError(t(language, "logRequiredError"));
+      return;
+    }
+
+    setSaving(true);
+    const supabase = getSupabaseClient();
+    const payload = {
+      date: form.date,
+      platform: form.platform,
+      start_time: form.start_time || null,
+      end_time: form.end_time || null,
+      miles_driven: miles,
+      gross_earnings: gross,
+      gas_spent: gasSpent,
+      gas_price_per_gallon: gasPrice,
+      extra_expenses: extraExpenses,
+      extra_expense_notes: form.extra_expense_notes.trim() || null,
+      notes: form.notes.trim() || null
+    };
+    const result = editingId
+      ? await supabase.from("driver_logs").update(payload).eq("id", editingId)
+      : await supabase.from("driver_logs").insert({ ...payload, user_id: user.id });
+    setSaving(false);
+
+    if (result.error) {
+      setError(result.error.message);
+      return;
+    }
+
+    resetForm();
+    setShowForm(false);
+    await loadData();
+    setMessage(t(language, "logSaved"));
+  }
+
+  async function deleteLog(id: string) {
+    const supabase = getSupabaseClient();
+    const { error: deleteError } = await supabase.from("driver_logs").delete().eq("id", id);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    setLogs((items) => items.filter((item) => item.id !== id));
+  }
+
+  function handleExport(format: ExportFormat) {
+    setExportError("");
+
+    if (!exportStartDate || !exportEndDate || exportStartDate > exportEndDate) {
+      setExportError(t(language, "noRecordsFoundForPeriod"));
+      return;
+    }
+
+    const selectedLogs = logs
+      .filter((log) => log.date >= exportStartDate && log.date <= exportEndDate)
+      .sort((first, second) => first.date.localeCompare(second.date));
+
+    if (selectedLogs.length === 0) {
+      setExportError(t(language, "noRecordsFoundForPeriod"));
+      return;
+    }
+
+    const rows = buildDriverLogExportRows(selectedLogs, language);
+    const baseFilename = `dailybills-driver-log-${exportStartDate}-to-${exportEndDate}`;
+
+    if (format === "xlsx") {
+      exportToXLSX(`${baseFilename}.xlsx`, rows, t(language, "driverLog"));
+      return;
+    }
+
+    exportToCSV(`${baseFilename}.csv`, rows);
+  }
+
+  return (
+    <>
+      <PageHeader
+        eyebrow={t(language, "driverLog")}
+        title={t(language, "driverLog")}
+        subtitle={t(language, "driverLogSubtitle")}
+        showBackToDashboard
+        backToDashboardLabel={t(language, "backToDashboard")}
+      />
+
+      {message ? <p className="mb-4 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">{message}</p> : null}
+      {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+      {loading ? <div className="card mb-4 p-4 text-sm text-neutral-600">{t(language, "loading")}</div> : null}
+
+      <div className="space-y-5">
+        <section className="card p-4">
+          <label className="block space-y-2">
+            <span className="field-label">{t(language, "weeklySettlementDay")}</span>
+            <select
+              className="field"
+              value={settlementDay}
+              disabled={savingSettlement || !canChangeSettlementDay}
+              onChange={(event) => saveSettlementDay(event.target.value as WeeklySettlementDay).catch(console.error)}
+            >
+              {weeklySettlementDays.map((day) => (
+                <option key={day} value={day}>
+                  {settlementDayLabel(language, day)}
+                </option>
+              ))}
+            </select>
+            {!canChangeSettlementDay ? (
+              <span className="block text-sm text-neutral-600">
+                {t(language, "weeklySettlementProMessage")}{" "}
+                <Link className="font-semibold text-brand-700" href="/pricing">
+                  {t(language, "upgrade")}
+                </Link>
+              </span>
+            ) : null}
+          </label>
+        </section>
+
+        <section className="card p-4">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-ink">{t(language, "exportDriverLogs")}</h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-2">
+              <span className="field-label">{t(language, "startDate")}</span>
+              <input
+                className="field"
+                type="date"
+                value={exportStartDate}
+                onChange={(event) => setExportStartDate(event.target.value)}
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="field-label">{t(language, "endDate")}</span>
+              <input
+                className="field"
+                type="date"
+                value={exportEndDate}
+                onChange={(event) => setExportEndDate(event.target.value)}
+              />
+            </label>
+          </div>
+          {exportError ? <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{exportError}</p> : null}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button className="btn-secondary" type="button" onClick={() => handleExport("csv")}>
+              {t(language, "exportCsv")}
+            </button>
+            <button className="btn-secondary" type="button" onClick={() => handleExport("xlsx")}>
+              {t(language, "exportExcel")}
+            </button>
+            <button className="btn-secondary" type="button" onClick={() => handleExport("google")}>
+              {t(language, "exportGoogleSheets")}
+            </button>
+          </div>
+        </section>
+
+        <WeeklySummaryCard
+          title={t(language, "currentWeekSummary")}
+          summary={currentWeekSummary}
+          currency={currency}
+          language={language}
+          showFull={showCurrentFullSummary}
+          onToggleFull={() => setShowCurrentFullSummary((value) => !value)}
+          onViewDetails={() => setDetailWeek((value) => (value === "current" ? null : "current"))}
+          viewDetailsLabel={t(language, "viewWeekDetails")}
+        />
+
+        {canViewWeeklyHistory ? (
+          <WeeklySummaryCard
+            title={t(language, "previousWeekSummary")}
+            summary={previousWeekSummary}
+            currency={currency}
+            language={language}
+            showFull={showPreviousFullSummary}
+            onToggleFull={() => setShowPreviousFullSummary((value) => !value)}
+            onViewDetails={() => setDetailWeek((value) => (value === "previous" ? null : "previous"))}
+            viewDetailsLabel={t(language, "viewPreviousWeekDetails")}
+            secondary
+          />
+        ) : (
+          <section className="card p-4">
+            <div className="mb-3 flex items-center gap-2 text-brand-700">
+              <ClipboardList size={20} aria-hidden="true" />
+              <h2 className="text-lg font-semibold text-ink">{t(language, "previousWeekSummary")}</h2>
+            </div>
+            <p className="text-sm text-neutral-600">{t(language, "weeklyHistoryProMessage")}</p>
+            <Link className="btn-primary mt-4" href="/pricing">
+              {t(language, "upgrade")}
+            </Link>
+          </section>
+        )}
+
+        {detailWeek ? (
+          <WeekDetailsCard
+            title={detailWeek === "current" ? t(language, "viewWeekDetails") : t(language, "viewPreviousWeekDetails")}
+            logs={selectedWeekLogs}
+            currency={currency}
+            language={language}
+            onEdit={editLog}
+            onDelete={deleteLog}
+          />
+        ) : null}
+
+        <section className="card p-4">
+          <button
+            className="flex w-full items-center justify-between gap-3 text-left"
+            type="button"
+            onClick={() => setShowForm((value) => !value)}
+          >
+            <span className="text-lg font-semibold text-ink">
+              {editingId ? t(language, "editDailyLog") : t(language, "addDailyLog")}
+            </span>
+            {showForm ? <ChevronUp className="text-brand-700" size={20} aria-hidden="true" /> : <ChevronDown className="text-brand-700" size={20} aria-hidden="true" />}
+          </button>
+
+          {showForm ? (
+            <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block space-y-2">
+                  <span className="field-label">{t(language, "date")}</span>
+                  <input className="field" type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
+                </label>
+                <label className="block space-y-2">
+                  <span className="field-label">{t(language, "platform")}</span>
+                  <select className="field" value={form.platform} onChange={(event) => setForm({ ...form, platform: event.target.value as Platform })}>
+                    {platforms.map((platform) => (
+                      <option key={platform}>{platform}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block space-y-2">
+                  <span className="field-label">{t(language, "startTime")}</span>
+                  <input className="field" type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} />
+                </label>
+                <label className="block space-y-2">
+                  <span className="field-label">{t(language, "endTime")}</span>
+                  <input className="field" type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} />
+                </label>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block space-y-2">
+                  <span className="field-label">{t(language, "milesDriven")}</span>
+                  <input className="field" inputMode="decimal" value={form.miles_driven} onChange={(event) => setForm({ ...form, miles_driven: event.target.value })} />
+                </label>
+                <label className="block space-y-2">
+                  <span className="field-label">{t(language, "grossEarnings")}</span>
+                  <input className="field" inputMode="decimal" value={form.gross_earnings} onChange={(event) => setForm({ ...form, gross_earnings: event.target.value })} />
+                </label>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block space-y-2">
+                  <span className="field-label">{t(language, "gasSpent")}</span>
+                  <input className="field" inputMode="decimal" value={form.gas_spent} onChange={(event) => setForm({ ...form, gas_spent: event.target.value })} />
+                </label>
+                <label className="block space-y-2">
+                  <span className="field-label">{t(language, "gasPricePerGallon")}</span>
+                  <input className="field" inputMode="decimal" value={form.gas_price_per_gallon} onChange={(event) => setForm({ ...form, gas_price_per_gallon: event.target.value })} />
+                </label>
+              </div>
+
+              <label className="block space-y-2">
+                <span className="field-label">{t(language, "extraExpenses")}</span>
+                <input className="field" inputMode="decimal" value={form.extra_expenses} onChange={(event) => setForm({ ...form, extra_expenses: event.target.value })} />
+              </label>
+
+              <div className="rounded-lg border border-line bg-neutral-50 p-3">
+                <p className="text-sm font-semibold text-ink">{t(language, "tripMath")}</p>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                  <Metric label={t(language, "hoursWorkedCalculated")} value={formatDurationFromDecimalHours(preview.hoursWorked)} />
+                  <Metric label={t(language, "gallonsBought")} value={preview.gallonsBought.toFixed(2)} />
+                  <Metric label={t(language, "netProfit")} value={formatCurrency(preview.netProfit, currency)} />
+                  <Metric label={t(language, "netPerHour")} value={formatHourlyRate(preview.netProfitPerHour, currency, language)} />
+                </div>
+              </div>
+
+              <label className="block space-y-2">
+                <span className="field-label">{t(language, "extraExpenseNotes")}</span>
+                <textarea className="field min-h-20" value={form.extra_expense_notes} onChange={(event) => setForm({ ...form, extra_expense_notes: event.target.value })} />
+              </label>
+
+              <label className="block space-y-2">
+                <span className="field-label">{t(language, "generalNotes")}</span>
+                <textarea className="field min-h-24" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+              </label>
+
+              {!editingId && !canCreateDriverLog ? (
+                <div className="rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-brand-800">
+                  <p>{t(language, "freeDriverLogLimitMessage")}</p>
+                  <Link className="btn-primary mt-3" href="/pricing">
+                    {t(language, "upgrade")}
+                  </Link>
+                </div>
+              ) : null}
+
+              <div className="flex flex-wrap gap-2">
+                <button className="btn-primary flex-1" type="submit" disabled={saving || (!editingId && !canCreateDriverLog)}>
+                  <Plus size={18} aria-hidden="true" />
+                  {saving ? t(language, "saving") : t(language, "saveLog")}
+                </button>
+                {editingId ? (
+                  <button className="btn-secondary" type="button" onClick={resetForm}>
+                    {t(language, "cancel")}
+                  </button>
+                ) : null}
+                <Link className="btn-secondary flex-1" href="/dashboard">
+                  {t(language, "backToDashboard")}
+                </Link>
+              </div>
+            </form>
+          ) : null}
+        </section>
+      </div>
+    </>
+  );
+}
+
+function WeeklySummaryCard({
+  title,
+  summary,
+  currency,
+  language,
+  showFull,
+  onToggleFull,
+  onViewDetails,
+  viewDetailsLabel,
+  secondary = false
+}: {
+  title: string;
+  summary: ReturnType<typeof calculateWeeklyDriverSummaryForRange>;
+  currency: string;
+  language: string;
+  showFull: boolean;
+  onToggleFull: () => void;
+  onViewDetails: () => void;
+  viewDetailsLabel: string;
+  secondary?: boolean;
+}) {
+  return (
+    <section className={`card p-4 ${secondary ? "opacity-90" : ""}`}>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-brand-700">
+            <ClipboardList size={20} aria-hidden="true" />
+            <h2 className="text-lg font-semibold text-ink">{title}</h2>
+          </div>
+          <p className="mt-1 text-sm text-neutral-600">
+            {t(language, "weekPeriod")}: {formatDate(summary.startDate, language)} - {formatDate(summary.endDate, language)}
+          </p>
+        </div>
+        <button className="btn-secondary min-h-10" type="button" onClick={onViewDetails}>
+          <CalendarDays size={17} aria-hidden="true" />
+          {viewDetailsLabel}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-6">
+        <Metric label={t(language, "totalGrossEarnings")} value={formatCurrency(summary.totalGrossEarnings, currency)} />
+        <Metric label={t(language, "totalMiles")} value={summary.totalMiles.toFixed(1)} />
+        <Metric label={t(language, "totalHoursWorked")} value={formatDurationFromDecimalHours(summary.totalHoursWorked)} />
+        <Metric label={t(language, "totalGasSpent")} value={formatCurrency(summary.totalGasSpent, currency)} />
+        <Metric label={t(language, "netProfit")} value={formatCurrency(summary.netProfit, currency)} />
+        <Metric label={t(language, "workDaysLogged")} value={String(summary.workDaysLogged)} />
+      </div>
+      <div className="mt-4 border-t border-line pt-3">
+        <button className="flex w-full items-center justify-between gap-3 text-left text-sm font-semibold text-brand-700" type="button" onClick={onToggleFull}>
+          <span>{showFull ? t(language, "hideFullSummary") : t(language, "showFullSummary")}</span>
+          {showFull ? <ChevronUp size={17} aria-hidden="true" /> : <ChevronDown size={17} aria-hidden="true" />}
+        </button>
+        {showFull ? (
+          <div className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+            <Metric label={t(language, "averageGasPrice")} value={formatCurrency(summary.averageGasPricePaid, currency)} />
+            <Metric label={t(language, "gallonsBought")} value={summary.totalGallonsBought.toFixed(2)} />
+            <Metric label={t(language, "grossPerHour")} value={formatHourlyRate(summary.grossPerHour, currency, language)} />
+            <Metric label={t(language, "netPerHour")} value={formatHourlyRate(summary.netPerHour, currency, language)} />
+            <Metric label={t(language, "grossPerMile")} value={formatCurrency(summary.grossPerMile, currency)} />
+            <Metric label={t(language, "netPerMile")} value={formatCurrency(summary.netPerMile, currency)} />
+            <Metric label={t(language, "extraExpenses")} value={formatCurrency(summary.totalExtraExpenses, currency)} />
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function WeekDetailsCard({
+  title,
+  logs,
+  currency,
+  language,
+  onEdit,
+  onDelete
+}: {
+  title: string;
+  logs: DriverLog[];
+  currency: string;
+  language: string;
+  onEdit: (log: DriverLog) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <section className="card p-4">
+      <div className="mb-4 flex items-center gap-2 text-brand-700">
+        <CalendarDays size={20} aria-hidden="true" />
+        <h2 className="text-lg font-semibold text-ink">{title}</h2>
+      </div>
+      {logs.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-line bg-neutral-50 p-4 text-sm text-neutral-600">
+          {t(language, "noDailyRecordsThisWeek")}
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {logs.map((log) => {
+            const metrics = calculateDriverLogMetrics(log);
+
+            return (
+              <article key={log.id} className="rounded-lg border border-line bg-neutral-50 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-ink">{formatDate(log.date, language)}</p>
+                    <p className="text-sm text-neutral-600">
+                      {log.platform} - {formatTime12Hour(log.start_time)} - {formatTime12Hour(log.end_time)}
+                    </p>
+                  </div>
+                  <p className="font-bold text-ink">{formatCurrency(metrics.netProfit, currency)}</p>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+                  <Metric label={t(language, "miles")} value={log.miles_driven.toFixed(1)} />
+                  <Metric label={t(language, "hoursWorkedCalculated")} value={formatDurationFromDecimalHours(metrics.hoursWorked)} />
+                  <Metric label={t(language, "gross")} value={formatCurrency(log.gross_earnings, currency)} />
+                  <Metric label={t(language, "gasSpent")} value={formatCurrency(log.gas_spent, currency)} />
+                  <Metric label={t(language, "extraExpenses")} value={formatCurrency(log.extra_expenses, currency)} />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button className="btn-secondary" type="button" onClick={() => onEdit(log)}>
+                    <Pencil size={17} aria-hidden="true" />
+                    {t(language, "edit")}
+                  </button>
+                  <button className="btn-danger" type="button" onClick={() => onDelete(log.id)}>
+                    <Trash2 size={17} aria-hidden="true" />
+                    {t(language, "delete")}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <p>
+      <span className="block text-neutral-500">{label}</span>
+      <span className="font-semibold text-ink">{value}</span>
+    </p>
+  );
+}

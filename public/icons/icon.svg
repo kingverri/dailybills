@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="DailyBills icon">
+  <rect width="512" height="512" rx="96" fill="#0d8354"/>
+  <path d="M126 154c0-26.5 21.5-48 48-48h164c26.5 0 48 21.5 48 48v204c0 26.5-21.5 48-48 48H174c-26.5 0-48-21.5-48-48V154Z" fill="#fffdf8"/>
+  <path d="M174 176h164M174 230h164M174 284h92" stroke="#0d8354" stroke-width="28" stroke-linecap="round"/>
+  <path d="M312 302c31.5 0 57 25.5 57 57s-25.5 57-57 57-57-25.5-57-57 25.5-57 57-57Z" fill="#e0a018"/>
+  <path d="M292 359h40M312 339v40" stroke="#151515" stroke-width="18" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,19 @@
+{
+  "name": "DailyBills",
+  "short_name": "DailyBills",
+  "description": "Know how much you can safely spend today and what you need to earn before bills are due.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#fffdf8",
+  "theme_color": "#0d8354",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "productivity"]
+}
