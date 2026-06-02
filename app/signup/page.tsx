@@ -1,11 +1,13 @@
 "use client";
 
-import { Eye, EyeOff, UserPlus } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthCard } from "@/components/auth/auth-card";
+import { normalizeLanguage, t } from "@/lib/i18n";
 import { getSupabaseClient } from "@/lib/supabase";
+import type { Language } from "@/types/app";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -16,6 +18,18 @@ export default function SignupPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [language, setLanguage] = useState<Language>("en");
+
+  useEffect(() => {
+    const storedLanguage = window.localStorage.getItem("dailybills-public-language");
+    const browserLanguage = navigator.language?.toLowerCase().startsWith("pt")
+      ? "pt"
+      : navigator.language?.toLowerCase().startsWith("es")
+        ? "es"
+        : "en";
+
+    setLanguage(normalizeLanguage(storedLanguage ?? browserLanguage));
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,6 +93,11 @@ export default function SignupPage() {
       title="Start planning"
       subtitle="Set up your driver budget in a few minutes."
     >
+      <Link className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-neutral-600 hover:text-brand-700" href="/">
+        <ArrowLeft size={16} aria-hidden="true" />
+        {t(language, "backToHome")}
+      </Link>
+
       <form className="space-y-4" onSubmit={handleSubmit}>
         <label className="block space-y-2">
           <span className="field-label">Full name</span>
