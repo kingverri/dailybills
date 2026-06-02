@@ -198,7 +198,7 @@ textarea {
 @layer components {
   .card {
     background: var(--card-bg);
-    @apply rounded-2xl border border-line shadow-card backdrop-blur;
+    @apply rounded-[1.7rem] border border-line shadow-card backdrop-blur;
     position: relative;
     overflow: hidden;
   }
@@ -219,15 +219,16 @@ textarea {
   }
 
   .metric-card {
-    @apply rounded-2xl border border-line bg-neutral-50 p-3 shadow-sm transition;
+    @apply rounded-[1.35rem] border border-line bg-neutral-50 p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-glow;
   }
 
   .icon-chip {
-    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-line bg-neutral-50 text-brand-700 shadow-sm;
+    background: var(--primary-gradient);
+    @apply inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-200 text-slate-950 shadow-glow;
   }
 
   .icon-chip-sm {
-    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-line bg-neutral-50 text-brand-700;
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-brand-200 bg-brand-50 text-brand-700 shadow-sm;
   }
 
   .badge {
@@ -263,19 +264,19 @@ textarea {
   }
 
   .field {
-    @apply w-full rounded-lg border border-line bg-neutral-50 px-3 py-3 text-base text-ink outline-none transition placeholder:text-neutral-500 focus:border-brand-500 focus:ring-4 focus:ring-brand-100;
+    @apply w-full rounded-2xl border border-line bg-neutral-50 px-3.5 py-3 text-base text-ink outline-none transition placeholder:text-neutral-500 focus:border-brand-500 focus:ring-4 focus:ring-brand-100;
   }
 
   .btn-primary {
     background: var(--primary-gradient);
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-slate-950 shadow-glow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-4 py-2 text-sm font-black text-slate-950 shadow-glow transition hover:-translate-y-0.5 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .btn-secondary {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-neutral-50 px-4 py-2 text-sm font-semibold text-neutral-800 transition hover:border-brand-200 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-line bg-neutral-50 px-4 py-2 text-sm font-bold text-neutral-800 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60;
   }
 
   .btn-danger {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 transition hover:-translate-y-0.5 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60;
   }
 }

@@ -19,17 +19,17 @@ export function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <header className="card mb-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
       <div className="min-w-0">
         {showBackToDashboard ? (
-          <Link className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-700" href="/dashboard">
+          <Link className="mb-4 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-bold text-brand-700" href="/dashboard">
             <ArrowLeft size={16} aria-hidden="true" />
             {backToDashboardLabel}
           </Link>
         ) : null}
         {eyebrow ? <p className="text-sm font-bold uppercase tracking-wide text-brand-700">{eyebrow}</p> : null}
-        <h1 className="mt-1 text-2xl font-black text-ink sm:text-3xl">{title}</h1>
-        {subtitle ? <p className="mt-1 max-w-2xl text-sm text-neutral-600">{subtitle}</p> : null}
+        <h1 className="mt-1 text-3xl font-black leading-tight text-ink sm:text-4xl">{title}</h1>
+        {subtitle ? <p className="mt-2 max-w-2xl text-sm font-medium leading-6 text-neutral-600">{subtitle}</p> : null}
       </div>
       {action ?? children}
     </header>

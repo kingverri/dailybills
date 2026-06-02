@@ -414,7 +414,7 @@ export default function DriverLogPage() {
       {loading ? <div className="card mb-4 p-4 text-sm text-neutral-600">{t(language, "loading")}</div> : null}
 
       <div className="space-y-5">
-        <section className="card p-4">
+        <section className="card p-5">
           <label className="block space-y-2">
             <span className="field-label">{t(language, "weeklySettlementDay")}</span>
             <select
@@ -440,9 +440,15 @@ export default function DriverLogPage() {
           </label>
         </section>
 
-        <section className="card p-4">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-ink">{t(language, "exportDriverLogs")}</h2>
+        <section className="card p-5">
+          <div className="mb-4 flex items-start gap-3">
+            <span className="icon-chip-sm">
+              <ClipboardList size={20} aria-hidden="true" />
+            </span>
+            <div>
+            <h2 className="text-lg font-black text-ink">{t(language, "exportDriverLogs")}</h2>
+            <p className="mt-1 text-sm font-medium text-neutral-600">{t(language, "driverLogSubtitle")}</p>
+            </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-2">
@@ -525,13 +531,16 @@ export default function DriverLogPage() {
           />
         ) : null}
 
-        <section className="card p-4">
+        <section className="card p-5">
           <button
             className="flex w-full items-center justify-between gap-3 text-left"
             type="button"
             onClick={() => setShowForm((value) => !value)}
           >
-            <span className="text-lg font-semibold text-ink">
+            <span className="flex items-center gap-3 text-lg font-black text-ink">
+              <span className="icon-chip-sm">
+                <Plus size={20} aria-hidden="true" />
+              </span>
               {editingId ? t(language, "editDailyLog") : t(language, "addDailyLog")}
             </span>
             {showForm ? <ChevronUp className="text-brand-700" size={20} aria-hidden="true" /> : <ChevronDown className="text-brand-700" size={20} aria-hidden="true" />}
@@ -721,14 +730,16 @@ function WeeklySummaryCard({
   secondary?: boolean;
 }) {
   return (
-    <section className={`card p-4 ${secondary ? "opacity-90" : ""}`}>
+    <section className={`card p-5 sm:p-6 ${secondary ? "opacity-90" : ""}`}>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-brand-700">
-            <ClipboardList size={20} aria-hidden="true" />
-            <h2 className="text-lg font-semibold text-ink">{title}</h2>
+            <span className="icon-chip-sm">
+              <ClipboardList size={20} aria-hidden="true" />
+            </span>
+            <h2 className="text-xl font-black text-ink">{title}</h2>
           </div>
-          <p className="mt-1 text-sm text-neutral-600">
+          <p className="mt-2 text-sm font-medium text-neutral-600">
             {t(language, "weekPeriod")}: {formatDate(summary.startDate, language)} - {formatDate(summary.endDate, language)}
           </p>
         </div>
@@ -791,10 +802,12 @@ function WeekDetailsCard({
   onDelete: (id: string) => void;
 }) {
   return (
-    <section className="card p-4">
+    <section className="card p-5">
       <div className="mb-4 flex items-center gap-2 text-brand-700">
-        <CalendarDays size={20} aria-hidden="true" />
-        <h2 className="text-lg font-semibold text-ink">{title}</h2>
+        <span className="icon-chip-sm">
+          <CalendarDays size={20} aria-hidden="true" />
+        </span>
+        <h2 className="text-xl font-black text-ink">{title}</h2>
       </div>
       {logs.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line bg-neutral-50 p-4 text-sm text-neutral-600">
@@ -807,23 +820,23 @@ function WeekDetailsCard({
             const WorkIcon = workLogTypeIcon(log.work_type);
 
             return (
-              <article key={log.id} className="rounded-lg border border-line bg-neutral-50 p-3">
+              <article key={log.id} className="rounded-[1.35rem] border border-line bg-neutral-50 p-4 shadow-sm">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-start gap-3">
-                    <span className="icon-chip-sm">
-                      <WorkIcon size={17} aria-hidden="true" />
+                    <span className="icon-chip">
+                      <WorkIcon size={24} aria-hidden="true" />
                     </span>
                     <div>
-                    <p className="font-semibold text-ink">{formatDate(log.date, language)}</p>
-                    <p className="text-sm text-neutral-600">
-                      {workLogTypeLabel(language, log.work_type ?? "driver")} - {log.platform}
-                    </p>
-                    <p className="text-sm text-neutral-600">
-                      {formatTime12Hour(log.start_time)} - {formatTime12Hour(log.end_time)}
-                    </p>
+                      <p className="text-lg font-black text-ink">{formatDate(log.date, language)}</p>
+                      <p className="text-sm font-medium text-neutral-600">
+                        {workLogTypeLabel(language, log.work_type ?? "driver")} - {log.platform}
+                      </p>
+                      <p className="text-sm font-medium text-neutral-600">
+                        {formatTime12Hour(log.start_time)} - {formatTime12Hour(log.end_time)}
+                      </p>
                     </div>
                   </div>
-                  <p className="font-bold text-ink">{formatCurrency(metrics.netProfit, currency)}</p>
+                  <p className="text-xl font-black text-ink">{formatCurrency(metrics.netProfit, currency)}</p>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
                   <Metric icon={Route} label={t(language, "miles")} value={log.miles_driven.toFixed(1)} />
@@ -870,12 +883,12 @@ function Metric({
   icon?: LucideIcon;
 }) {
   return (
-    <p className="metric-card p-2">
-      <span className="flex items-center gap-1 text-neutral-500">
-        {Icon ? <Icon size={13} aria-hidden="true" /> : null}
+    <p className="metric-card p-3">
+      <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-neutral-500">
+        {Icon ? <Icon size={16} aria-hidden="true" /> : null}
         {label}
       </span>
-      <span className="font-semibold text-ink">{value}</span>
+      <span className="mt-1 block text-base font-black text-ink">{value}</span>
     </p>
   );
 }

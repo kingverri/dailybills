@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Sparkles } from "lucide-react";
+import { Check, Sparkles, Wallet } from "lucide-react";
 import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/components/auth-provider";
@@ -45,7 +45,7 @@ function PlanCard({
   const isFree = plan.id === "free";
 
   return (
-    <article className={`card relative flex flex-col p-5 ${plan.isBestValue ? "border-brand-200 shadow-glow" : ""}`}>
+    <article className={`card relative flex flex-col p-6 ${plan.isBestValue ? "border-brand-200 shadow-glow" : ""}`}>
       {plan.isBestValue ? (
         <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-700">
           <Sparkles size={14} aria-hidden="true" />
@@ -54,16 +54,19 @@ function PlanCard({
       ) : null}
 
       <div className="pr-24">
-        <h2 className="text-xl font-black text-ink">{t(language, plan.nameKey)}</h2>
-        <p className="mt-2 text-sm text-neutral-600">{t(language, plan.descriptionKey)}</p>
+        <span className={plan.isBestValue ? "icon-chip" : "icon-chip-sm"}>
+          <Wallet size={plan.isBestValue ? 25 : 20} aria-hidden="true" />
+        </span>
+        <h2 className="mt-5 text-2xl font-black text-ink">{t(language, plan.nameKey)}</h2>
+        <p className="mt-2 text-sm font-medium leading-6 text-neutral-600">{t(language, plan.descriptionKey)}</p>
       </div>
 
       <div className="mt-6">
-        <span className="text-4xl font-black text-ink">{plan.price}</span>
+        <span className="text-5xl font-black text-ink">{plan.price}</span>
         {plan.interval !== "none" ? <span className="ml-1 text-sm font-semibold text-neutral-500">/{plan.interval}</span> : null}
       </div>
 
-      <ul className="mt-6 flex-1 space-y-3 text-sm text-neutral-600">
+      <ul className="mt-6 flex-1 space-y-3 text-sm font-medium text-neutral-600">
         {plan.features.map((feature) => (
           <li key={feature} className="flex gap-2">
             <Check className="mt-0.5 shrink-0 text-brand-700" size={16} aria-hidden="true" />

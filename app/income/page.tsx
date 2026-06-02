@@ -317,11 +317,11 @@ export default function IncomePage() {
       />
 
       <div className="space-y-5">
-        <section className="card space-y-4 p-4">
+        <section className="card space-y-4 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-2">
               <p className="field-label">{t(language, "selectedMonth")}</p>
-              <p className="text-xl font-semibold capitalize text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
+              <p className="text-2xl font-black capitalize text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -361,41 +361,46 @@ export default function IncomePage() {
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
             <p className="metric-card">
               <span className="mb-2 flex items-center gap-2 text-neutral-500"><DollarSign size={15} aria-hidden="true" />{t(language, "totalGross")}</span>
-              <span className="font-semibold text-ink">{formatCurrency(monthSummary.gross, currency)}</span>
+              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.gross, currency)}</span>
             </p>
             <p className="metric-card">
               <span className="mb-2 flex items-center gap-2 text-neutral-500"><TrendingUp size={15} aria-hidden="true" />{t(language, "netProfit")}</span>
-              <span className="font-semibold text-ink">{formatCurrency(monthSummary.net, currency)}</span>
+              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.net, currency)}</span>
             </p>
             <p className="metric-card">
               <span className="mb-2 flex items-center gap-2 text-neutral-500"><Route size={15} aria-hidden="true" />{t(language, "miles")}</span>
-              <span className="font-semibold text-ink">{monthSummary.miles.toFixed(1)}</span>
+              <span className="text-lg font-black text-ink">{monthSummary.miles.toFixed(1)}</span>
             </p>
             <p className="metric-card">
               <span className="mb-2 flex items-center gap-2 text-neutral-500"><Clock3 size={15} aria-hidden="true" />{t(language, "hours")}</span>
-              <span className="font-semibold text-ink">{formatDurationFromDecimalHours(monthSummary.hours)}</span>
+              <span className="text-lg font-black text-ink">{formatDurationFromDecimalHours(monthSummary.hours)}</span>
             </p>
             <p className="metric-card">
               <span className="mb-2 flex items-center gap-2 text-neutral-500"><Fuel size={15} aria-hidden="true" />{t(language, "gasSpent")}</span>
-              <span className="font-semibold text-ink">{formatCurrency(monthSummary.gas, currency)}</span>
+              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.gas, currency)}</span>
             </p>
             <p className="metric-card">
               <span className="mb-2 flex items-center gap-2 text-neutral-500"><BarChart3 size={15} aria-hidden="true" />{t(language, "extraExpenses")}</span>
-              <span className="font-semibold text-ink">{formatCurrency(monthSummary.extra, currency)}</span>
+              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.extra, currency)}</span>
             </p>
             <p className="metric-card">
               <span className="mb-2 flex items-center gap-2 text-neutral-500"><BarChart3 size={15} aria-hidden="true" />{t(language, "entries")}</span>
-              <span className="font-semibold text-ink">{monthSummary.count}</span>
+              <span className="text-lg font-black text-ink">{monthSummary.count}</span>
             </p>
           </div>
         </section>
 
-        <section className="card p-4">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-ink">{t(language, "exportIncome")}</h2>
-            <p className="mt-1 text-sm text-neutral-600">
+        <section className="card p-5">
+          <div className="mb-4 flex items-start gap-3">
+            <span className="icon-chip-sm">
+              <BarChart3 size={20} aria-hidden="true" />
+            </span>
+            <div>
+            <h2 className="text-lg font-black text-ink">{t(language, "exportIncome")}</h2>
+            <p className="mt-1 text-sm font-medium text-neutral-600">
               {t(language, "selectedMonth")}: {formatSelectedMonth(selectedMonth, language)}
             </p>
+            </div>
           </div>
           {exportError ? <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{exportError}</p> : null}
           <div className="mt-4 flex flex-wrap gap-2">
@@ -411,13 +416,16 @@ export default function IncomePage() {
           </div>
         </section>
 
-        <section className="card p-4">
+        <section className="card p-5">
           <button
             className="flex w-full items-center justify-between gap-3 text-left"
             type="button"
             onClick={() => setShowForm((value) => !value)}
           >
-            <span className="text-lg font-semibold text-ink">
+            <span className="flex items-center gap-3 text-lg font-black text-ink">
+              <span className="icon-chip-sm">
+                <Plus size={20} aria-hidden="true" />
+              </span>
               {editingId ? t(language, "editIncome") : t(language, "addIncome")}
             </span>
             {showForm ? <ChevronUp className="text-brand-700" size={20} aria-hidden="true" /> : <ChevronDown className="text-brand-700" size={20} aria-hidden="true" />}
@@ -539,8 +547,8 @@ export default function IncomePage() {
               <button
                 key={value}
                 className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                  filter === value ? "bg-brand-50 text-brand-700" : "bg-neutral-50 text-neutral-600 hover:text-ink"
-                }`}
+                    filter === value ? "border border-brand-200 bg-brand-50 text-brand-700 shadow-glow" : "border border-line bg-neutral-50 text-neutral-600 hover:text-ink"
+                  }`}
                 type="button"
                 onClick={() => setFilter(value)}
               >
@@ -568,15 +576,15 @@ export default function IncomePage() {
               const expanded = expandedEntries.includes(entry.id);
 
               return (
-              <article key={entry.id} className="card p-3">
+              <article key={entry.id} className="card p-4 transition hover:-translate-y-0.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    <span className={`icon-chip-sm ${incomeTypeBadgeClass(entry.income_entry_type)}`}>
-                      <DollarSign size={17} aria-hidden="true" />
+                    <span className={`icon-chip ${incomeTypeBadgeClass(entry.income_entry_type)}`}>
+                      <DollarSign size={24} aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                    <p className="font-semibold text-ink">{entry.platform}</p>
-                    <p className="text-sm text-neutral-600">
+                    <p className="text-lg font-black text-ink">{entry.platform}</p>
+                    <p className="text-sm font-medium text-neutral-600">
                       {formatDate(entry.date, language)}
                     </p>
                     <span className={`badge mt-2 ${incomeTypeBadgeClass(entry.income_entry_type)}`}>
@@ -584,7 +592,7 @@ export default function IncomePage() {
                     </span>
                     </div>
                   </div>
-                  <p className="text-lg font-bold text-ink">{formatCurrency(entry.net_profit, currency)}</p>
+                  <p className="text-xl font-black text-ink">{formatCurrency(entry.net_profit, currency)}</p>
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
                   <p className="metric-card p-2">

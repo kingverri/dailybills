@@ -21,8 +21,8 @@ export function BottomNav() {
   const language = profile?.language ?? "en";
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/90 px-2 py-2 backdrop-blur-xl lg:hidden">
-      <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/92 px-2 py-2 shadow-2xl backdrop-blur-2xl lg:hidden">
+      <div className="mx-auto grid max-w-xl grid-cols-5 gap-1 rounded-3xl border border-line bg-neutral-50/70 p-1 shadow-card">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;
@@ -32,13 +32,13 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={clsx(
-                "flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold transition",
+                "flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-[11px] font-bold transition",
                 active
                   ? "border border-brand-200 bg-brand-50 text-brand-700 shadow-glow"
-                  : "text-neutral-500 hover:bg-neutral-50 hover:text-ink"
+                  : "text-neutral-500 hover:bg-surface hover:text-ink"
               )}
             >
-              <Icon size={20} aria-hidden="true" />
+              <Icon size={22} aria-hidden="true" />
               <span>{t(language, item.labelKey)}</span>
             </Link>
           );

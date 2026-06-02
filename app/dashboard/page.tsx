@@ -161,6 +161,7 @@ export default function DashboardPage() {
       <PageHeader
         eyebrow={t(language, "dashboard")}
         title={t(language, "todayName", { name: profile?.full_name?.split(" ")[0] ?? t(language, "driver") })}
+        subtitle={t(language, "dashboardSubtitle")}
       >
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
           <Link className="btn-secondary" href="/bills">
@@ -264,20 +265,20 @@ export default function DashboardPage() {
             <StatCard label={t(language, "riskLevel")} value={riskCopy.label} helper={riskCopy.helper} icon={ShieldAlert} tone={riskCopy.tone} />
           </div>
 
-          <section className="card p-4">
+          <section className="card p-5 sm:p-6">
             <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-start gap-3">
                 <span className="icon-chip">
-                  <Activity size={21} aria-hidden="true" />
+                  <Activity size={26} aria-hidden="true" />
                 </span>
                 <div>
-                <h2 className="text-lg font-semibold text-ink">{t(language, "cashFlowProjection")}</h2>
-                <p className="text-sm text-neutral-600">
-                  {t(language, "projectionPeriod")}: {projectionPeriodLabel(language, dashboard.cashFlow.period)}
-                </p>
-                <p className="text-sm text-neutral-600">
-                  {formatDate(dashboard.cashFlow.startDate, language)} - {formatDate(dashboard.cashFlow.endDate, language)}
-                </p>
+                  <h2 className="text-xl font-black text-ink">{t(language, "cashFlowProjection")}</h2>
+                  <p className="text-sm font-medium text-neutral-600">
+                    {t(language, "projectionPeriod")}: {projectionPeriodLabel(language, dashboard.cashFlow.period)}
+                  </p>
+                  <p className="text-sm font-medium text-neutral-600">
+                    {formatDate(dashboard.cashFlow.startDate, language)} - {formatDate(dashboard.cashFlow.endDate, language)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -365,40 +366,40 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <section className="card p-4">
+          <section className="card p-5 sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-brand-700">
                 <span className="icon-chip-sm">
-                  <CalendarDays size={18} aria-hidden="true" />
+                  <CalendarDays size={20} aria-hidden="true" />
                 </span>
-                <h2 className="text-lg font-semibold text-ink">{t(language, "upcomingBills")}</h2>
+                <h2 className="text-xl font-black text-ink">{t(language, "upcomingBills")}</h2>
               </div>
-              <Link className="text-sm font-semibold text-brand-700" href="/bills">
+              <Link className="btn-secondary min-h-10 px-3" href="/bills">
                 {t(language, "viewAllBills")}
               </Link>
             </div>
             {dashboard.nextBill ? (
               <div className="space-y-4">
-                <div className="flex flex-col gap-2 rounded-lg border border-line bg-neutral-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 rounded-[1.35rem] border border-line bg-neutral-50 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-3">
                     <span className="icon-chip-sm text-fuel-700">
-                      <Receipt size={17} aria-hidden="true" />
+                      <Receipt size={20} aria-hidden="true" />
                     </span>
                     <div>
-                    <p className="font-semibold text-ink">{dashboard.nextBill.name}</p>
-                    <p className="text-sm text-neutral-600">
-                      {t(language, "due")} {formatDate(dashboard.nextBill.occurrenceDate, language)}{" - "}
-                      {dashboard.nextBill.daysRemaining === 1
-                        ? t(language, "daysLeft", { count: dashboard.nextBill.daysRemaining })
-                        : t(language, "daysLeftPlural", { count: dashboard.nextBill.daysRemaining })}
-                    </p>
-                    <span className={clsx("badge mt-2", dashboard.nextBill.daysRemaining < 0 ? "badge-danger" : dashboard.nextBill.daysRemaining <= 7 ? "badge-warn" : "badge-muted")}>
-                      <CalendarDays size={13} aria-hidden="true" />
-                      {dashboard.nextBill.daysRemaining < 0 ? t(language, "overdue") : dashboard.nextBill.daysRemaining <= 7 ? t(language, "dueSoon") : t(language, "unpaid")}
-                    </span>
+                      <p className="text-lg font-black text-ink">{dashboard.nextBill.name}</p>
+                      <p className="text-sm font-medium text-neutral-600">
+                        {t(language, "due")} {formatDate(dashboard.nextBill.occurrenceDate, language)}{" - "}
+                        {dashboard.nextBill.daysRemaining === 1
+                          ? t(language, "daysLeft", { count: dashboard.nextBill.daysRemaining })
+                          : t(language, "daysLeftPlural", { count: dashboard.nextBill.daysRemaining })}
+                      </p>
+                      <span className={clsx("badge mt-2", dashboard.nextBill.daysRemaining < 0 ? "badge-danger" : dashboard.nextBill.daysRemaining <= 7 ? "badge-warn" : "badge-muted")}>
+                        <CalendarDays size={13} aria-hidden="true" />
+                        {dashboard.nextBill.daysRemaining < 0 ? t(language, "overdue") : dashboard.nextBill.daysRemaining <= 7 ? t(language, "dueSoon") : t(language, "unpaid")}
+                      </span>
                     </div>
                   </div>
-                  <p className="text-xl font-bold text-ink">{formatCurrency(dashboard.nextBill.amount, currency)}</p>
+                  <p className="text-2xl font-black text-ink">{formatCurrency(dashboard.nextBill.amount, currency)}</p>
                 </div>
                 <div className="grid gap-3 text-sm sm:grid-cols-3">
                   <CompactMetric label={t(language, "projectedCash")} value={formatCurrency(dashboard.cashFlow.projectedCash, currency)} />
@@ -432,15 +433,15 @@ export default function DashboardPage() {
             )}
           </section>
 
-          <section className="card p-4">
+          <section className="card p-5 sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-start gap-3">
                 <span className="icon-chip">
-                  <BarChart3 size={21} aria-hidden="true" />
+                  <BarChart3 size={26} aria-hidden="true" />
                 </span>
                 <div>
-                <h2 className="text-lg font-semibold text-ink">{t(language, "currentMonthSummary")}</h2>
-                <p className="text-sm text-neutral-600">{t(language, "currentMonthSummaryHelper")}</p>
+                  <h2 className="text-xl font-black text-ink">{t(language, "currentMonthSummary")}</h2>
+                  <p className="text-sm font-medium text-neutral-600">{t(language, "currentMonthSummaryHelper")}</p>
                 </div>
               </div>
             </div>
@@ -475,22 +476,22 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <Link className="card flex items-center justify-between gap-4 p-4 transition hover:border-brand-200 hover:bg-brand-50" href="/driver-log">
+          <Link className="card flex items-center justify-between gap-4 p-5 transition hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50" href="/driver-log">
             <div className="flex items-center gap-3">
               <span className="icon-chip">
-                <ClipboardList size={22} aria-hidden="true" />
+                <ClipboardList size={28} aria-hidden="true" />
               </span>
               <div>
-                <h2 className="font-semibold text-ink">{t(language, "driverLog")}</h2>
-                <p className="text-sm text-neutral-600">{t(language, "driverLogDashboardHelper")}</p>
+                <h2 className="text-lg font-black text-ink">{t(language, "driverLog")}</h2>
+                <p className="text-sm font-medium text-neutral-600">{t(language, "driverLogDashboardHelper")}</p>
               </div>
             </div>
             <span className="btn-secondary min-h-10 shrink-0">{t(language, "open")}</span>
           </Link>
 
           {bills.length === 0 || entries.length === 0 || vehicles.length === 0 || paySchedules.length === 0 ? (
-            <section className="card p-4">
-              <h2 className="mb-3 text-lg font-semibold text-ink">{t(language, "setupReminders")}</h2>
+            <section className="card p-5">
+              <h2 className="mb-3 text-lg font-black text-ink">{t(language, "setupReminders")}</h2>
               <div className="divide-y divide-line">
               {bills.length === 0 ? (
                 <SetupReminder href="/bills" label={t(language, "addBill")} />
@@ -523,24 +524,24 @@ function SummaryItem({ label, value, icon: Icon, tone = "neutral" }: { label: st
         tone === "danger" && "border-red-200"
       )}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-black uppercase tracking-wide text-neutral-500">{label}</p>
         {Icon ? (
-          <span className={clsx("icon-chip-sm", tone === "warn" && "text-amber-700", tone === "danger" && "text-red-700")}>
-            <Icon size={16} aria-hidden="true" />
+          <span className={clsx("icon-chip-sm", tone === "warn" && "border-amber-200 bg-amber-50 text-amber-700", tone === "danger" && "border-red-200 bg-red-50 text-red-700")}>
+            <Icon size={20} aria-hidden="true" />
           </span>
         ) : null}
-        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</p>
       </div>
-      <p className="mt-1 text-lg font-bold text-ink">{value}</p>
+      <p className="mt-3 text-xl font-black text-ink">{value}</p>
     </div>
   );
 }
 
 function CompactMetric({ label, value }: { label: string; value: string }) {
   return (
-    <p className="rounded-lg border border-line bg-neutral-50 p-3">
-      <span className="block text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</span>
-      <span className="mt-1 block font-semibold text-ink">{value}</span>
+    <p className="rounded-[1.2rem] border border-line bg-neutral-50 p-3.5 shadow-sm">
+      <span className="block text-xs font-black uppercase tracking-wide text-neutral-500">{label}</span>
+      <span className="mt-1 block text-lg font-black text-ink">{value}</span>
     </p>
   );
 }
@@ -548,7 +549,12 @@ function CompactMetric({ label, value }: { label: string; value: string }) {
 function SetupReminder({ href, label }: { href: string; label: string }) {
   return (
     <Link className="flex items-center justify-between gap-3 py-3 text-sm font-semibold text-ink transition hover:text-brand-700" href={href}>
-      <span>{label}</span>
+      <span className="flex items-center gap-3">
+        <span className="icon-chip-sm">
+          <CheckCircle2 size={18} aria-hidden="true" />
+        </span>
+        {label}
+      </span>
       <ArrowRight className="shrink-0 text-brand-700" size={16} aria-hidden="true" />
     </Link>
   );

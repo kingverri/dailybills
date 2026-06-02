@@ -394,13 +394,18 @@ export default function BillsPage() {
       />
 
       <div className="space-y-5">
-        <section className="card p-4">
+        <section className="card p-5">
           <button
             className="flex w-full items-center justify-between gap-3 text-left"
             type="button"
             onClick={() => setShowForm((value) => !value)}
           >
-            <span className="text-lg font-semibold text-ink">{editingId ? t(language, "editBill") : t(language, "addBillForm")}</span>
+            <span className="flex items-center gap-3 text-lg font-black text-ink">
+              <span className="icon-chip-sm">
+                <Plus size={20} aria-hidden="true" />
+              </span>
+              {editingId ? t(language, "editBill") : t(language, "addBillForm")}
+            </span>
             {showForm ? <ChevronUp className="text-brand-700" size={20} aria-hidden="true" /> : <ChevronDown className="text-brand-700" size={20} aria-hidden="true" />}
           </button>
 
@@ -542,11 +547,11 @@ export default function BillsPage() {
           ) : null}
         </section>
 
-        <section className="card space-y-4 p-4">
+        <section className="card space-y-4 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-2">
               <p className="field-label">{t(language, "selectedMonth")}</p>
-              <p className="text-xl font-semibold capitalize text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
+              <p className="text-2xl font-black capitalize text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -584,21 +589,21 @@ export default function BillsPage() {
             />
           </label>
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "totalForMonth")}</span>
-              <span className="font-semibold text-ink">{formatCurrency(monthSummary.total, currency)}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><CircleDollarSign size={18} aria-hidden="true" />{t(language, "totalForMonth")}</span>
+              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.total, currency)}</span>
             </p>
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "paid")}</span>
-              <span className="font-semibold text-ink">{formatCurrency(monthSummary.paid, currency)}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><CheckCircle2 size={18} aria-hidden="true" />{t(language, "paid")}</span>
+              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.paid, currency)}</span>
             </p>
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "unpaid")}</span>
-              <span className="font-semibold text-ink">{formatCurrency(monthSummary.unpaid, currency)}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><Clock3 size={18} aria-hidden="true" />{t(language, "unpaid")}</span>
+              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.unpaid, currency)}</span>
             </p>
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "bills")}</span>
-              <span className="font-semibold text-ink">{monthSummary.count}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><Receipt size={18} aria-hidden="true" />{t(language, "bills")}</span>
+              <span className="text-lg font-black text-ink">{monthSummary.count}</span>
             </p>
           </div>
         </section>
@@ -610,7 +615,7 @@ export default function BillsPage() {
                 <button
                   key={value}
                   className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                    filter === value ? "bg-brand-50 text-brand-700" : "bg-neutral-50 text-neutral-600 hover:text-ink"
+                    filter === value ? "border border-brand-200 bg-brand-50 text-brand-700 shadow-glow" : "border border-line bg-neutral-50 text-neutral-600 hover:text-ink"
                   }`}
                   type="button"
                   onClick={() => setFilter(value)}
@@ -648,16 +653,16 @@ export default function BillsPage() {
               return (
               <article
                 key={`${bill.id}:${bill.occurrenceDate}`}
-                className={`card border-l-4 p-3 ${billCategoryTone(bill.category)}`}
+                className={`card border-l-4 p-4 transition hover:-translate-y-0.5 ${billCategoryTone(bill.category)}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    <span className={`icon-chip-sm ${billCategoryTone(bill.category)}`}>
-                      <CategoryIcon size={17} aria-hidden="true" />
+                    <span className={`icon-chip ${billCategoryTone(bill.category)}`}>
+                      <CategoryIcon size={24} aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate font-semibold text-ink">{bill.name}</p>
-                      <p className="text-sm text-neutral-600">
+                      <p className="truncate text-lg font-black text-ink">{bill.name}</p>
+                      <p className="text-sm font-medium text-neutral-600">
                         {t(language, "due")} {formatDate(bill.occurrenceDate, language)}
                       </p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
@@ -674,7 +679,7 @@ export default function BillsPage() {
                       </div>
                     </div>
                   </div>
-                  <p className="text-lg font-bold text-ink">{formatCurrency(bill.amount, currency)}</p>
+                  <p className="text-xl font-black text-ink">{formatCurrency(bill.amount, currency)}</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button className="btn-secondary" type="button" onClick={() => toggleStatus(bill)}>

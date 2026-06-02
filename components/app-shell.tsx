@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       {!isOnboarding || profile?.onboarding_completed ? <AppHeader /> : null}
-      <main className="mx-auto min-h-dvh w-full max-w-5xl px-4 pb-28 pt-5 sm:px-6 lg:pb-10 lg:pt-8">
+      <main className="mx-auto min-h-dvh w-full max-w-7xl px-4 pb-28 pt-5 sm:px-6 lg:pb-10 lg:pt-8">
         {children}
       </main>
       {!isOnboarding || profile?.onboarding_completed ? <BottomNav /> : null}

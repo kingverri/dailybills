@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Pencil, Plus, Sparkles, Trash2, UserRound } from "lucide-react";
+import { CalendarDays, LogOut, Pencil, Plus, Sparkles, Trash2, UserRound, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -352,8 +352,16 @@ export default function SettingsPage() {
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,420px)_1fr]">
-        <form className="card space-y-4 p-4" onSubmit={saveProfile}>
-          <h2 className="text-lg font-semibold text-ink">{t(language, "userProfile")}</h2>
+        <form className="card space-y-4 p-5" onSubmit={saveProfile}>
+          <div className="flex items-start gap-3">
+            <span className="icon-chip-sm">
+              <UserRound size={20} aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-lg font-black text-ink">{t(language, "userProfile")}</h2>
+              <p className="mt-1 text-sm font-medium text-neutral-600">{t(language, "settingsSubtitle")}</p>
+            </div>
+          </div>
 
           <label className="block space-y-2">
             <span className="field-label">{t(language, "fullName")}</span>
@@ -450,17 +458,17 @@ export default function SettingsPage() {
         </form>
 
         <section className="space-y-5">
-          <div className="card p-4">
+          <div className="card p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <span className="rounded-md bg-brand-50 p-3 text-brand-700">
-                  <Sparkles size={20} aria-hidden="true" />
+                <span className="icon-chip">
+                  <Sparkles size={25} aria-hidden="true" />
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-neutral-600">
+                  <p className="text-sm font-bold text-neutral-600">
                     {t(language, "currentPlan")}: {t(language, currentPlanConfig.nameKey)}
                   </p>
-                  <p className="text-xl font-black text-ink">{t(language, currentPlanConfig.nameKey)}</p>
+                  <p className="text-2xl font-black text-ink">{t(language, currentPlanConfig.nameKey)}</p>
                 </div>
               </div>
               <Link className="btn-primary" href="/pricing">
@@ -469,10 +477,18 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <form className="card space-y-4 p-4" onSubmit={saveSchedule}>
-            <h2 className="text-lg font-semibold text-ink">
-              {editingScheduleId ? t(language, "editPaySchedule") : t(language, "addPaySchedule")}
-            </h2>
+          <form className="card space-y-4 p-5" onSubmit={saveSchedule}>
+            <div className="flex items-start gap-3">
+              <span className="icon-chip-sm">
+                <CalendarDays size={20} aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="text-lg font-black text-ink">
+                  {editingScheduleId ? t(language, "editPaySchedule") : t(language, "addPaySchedule")}
+                </h2>
+                <p className="mt-1 text-sm font-medium text-neutral-600">{t(language, "paymentPattern")}</p>
+              </div>
+            </div>
 
             <label className="block space-y-2">
               <span className="field-label">{t(language, "paymentPattern")}</span>
@@ -570,13 +586,18 @@ export default function SettingsPage() {
               schedules.map((schedule) => (
                 <article key={schedule.id} className="card p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold capitalize text-ink">
+                    <div className="flex items-start gap-3">
+                      <span className="icon-chip-sm">
+                        <WalletCards size={20} aria-hidden="true" />
+                      </span>
+                      <div>
+                      <p className="font-black capitalize text-ink">
                         {scheduleTypeLabel(language, schedule.schedule_type)}
                       </p>
-                      <p className="text-sm text-neutral-600">{describeSchedule(schedule, language)}</p>
+                      <p className="text-sm font-medium text-neutral-600">{describeSchedule(schedule, language)}</p>
+                      </div>
                     </div>
-                    <p className="font-bold text-ink">{formatCurrency(schedule.estimated_amount, profileForm.currency)}</p>
+                    <p className="text-lg font-black text-ink">{formatCurrency(schedule.estimated_amount, profileForm.currency)}</p>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button className="btn-secondary" type="button" onClick={() => editSchedule(schedule)}>
