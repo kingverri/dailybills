@@ -15,14 +15,12 @@ import {
   Plus,
   Receipt,
   ShieldAlert,
-  Target,
   Wallet
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { StatCard } from "@/components/stat-card";
 import { useAuth } from "@/components/auth-provider";
 import {
   calculateCashFlowProjectionForPeriod,
@@ -142,23 +140,34 @@ export default function DashboardPage() {
     };
   }, [asOf, billOccurrenceStatuses, bills, currentBalance, entries, paySchedules, projectionRange]);
 
-  const riskCopy = {
+  const statusCopy = {
     low: {
-      label: t(language, "onTrack"),
+      label: t(language, "periodOnTrack"),
       helper: t(language, "riskLowHelper"),
-      tone: "good" as const
+      tone: "good" as const,
+      className: "border-brand-200 bg-brand-500/10 text-brand-700"
     },
     medium: {
-      label: t(language, "keepItTight"),
+      label: t(language, "periodClose"),
       helper: t(language, "riskMediumHelper"),
-      tone: "warn" as const
+      tone: "warn" as const,
+      className: "border-amber-200 bg-amber-50 text-amber-800"
     },
     high: {
-      label: t(language, "behind"),
+      label: t(language, "periodBehind"),
       helper: t(language, "riskHighHelper"),
-      tone: "danger" as const
+      tone: "danger" as const,
+      className: "border-red-200 bg-red-500/10 text-red-700"
     }
   }[dashboard.cashFlow.riskLevel];
+  const hasShortfall = dashboard.cashFlow.shortfall > 0;
+  const periodResultLabel = hasShortfall ? t(language, "shortfallToCover") : t(language, "estimatedLeftover");
+  const periodResultValue = hasShortfall
+    ? dashboard.cashFlow.shortfall
+    : Math.max(0, dashboard.cashFlow.projectedBalanceAfterBills);
+  const recommendedAction = hasShortfall
+    ? `${t(language, "earnAtLeast")} ${formatCurrency(dashboard.cashFlow.shortfall, currency)} ${t(language, "toCoverPeriodBills")}`
+    : t(language, "coveredForUpcomingBillsPeriod");
 
   return (
     <>
@@ -251,55 +260,70 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <StatCard
-              label={t(language, "safeToSpendToday")}
-              value={formatCurrency(dashboard.cashFlow.safeToSpendToday, currency)}
-              helper={t(language, "basedOnProjectionPeriod")}
-              icon={Wallet}
-              tone="good"
-            />
-            <StatCard
-              label={t(language, "needToEarnToday")}
-              value={formatCurrency(dashboard.cashFlow.needToEarnToday, currency)}
-              helper={t(language, "basedOnProjectionPeriod")}
-              icon={Target}
-              tone={dashboard.cashFlow.needToEarnToday > 0 ? "warn" : "neutral"}
-            />
-            <StatCard label={t(language, "riskLevel")} value={riskCopy.label} helper={riskCopy.helper} icon={ShieldAlert} tone={riskCopy.tone} />
-          </div>
-
-          <section className="card p-5 sm:p-6">
-            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex items-start gap-3">
-                <span className="icon-chip">
-                  <Activity size={26} aria-hidden="true" />
-                </span>
-                <div>
-                  <h2 className="text-xl font-black text-ink">{t(language, "cashFlowProjection")}</h2>
-                  <p className="text-sm font-medium text-neutral-600">
-                    {t(language, "projectionPeriod")}: {projectionPeriodLabel(language, dashboard.cashFlow.period)}
-                  </p>
-                  <p className="text-sm font-medium text-neutral-600">
-                    {formatDate(dashboard.cashFlow.startDate, language)} - {formatDate(dashboard.cashFlow.endDate, language)}
-                  </p>
+          <section className="card overflow-hidden p-0">
+            <div className="border-b border-line bg-neutral-50 p-5 sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <span className="icon-chip">
+                    <ShieldAlert size={26} aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wide text-neutral-500">{t(language, "periodStatus")}</p>
+                    <h2 className="mt-1 text-2xl font-black text-ink sm:text-3xl">{t(language, "canCoverUpcomingBills")}</h2>
+                    <p className="mt-1 text-sm font-medium text-neutral-600">{t(language, "projectionBasedOnIncomeBalanceBills")}</p>
+                  </div>
                 </div>
+                <span className={clsx("inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-black", statusCopy.className)}>
+                  <Activity size={15} aria-hidden="true" />
+                  {statusCopy.label}
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <DashboardMetric
+                  icon={PiggyBank}
+                  label={t(language, "projectedCash")}
+                  value={formatCurrency(dashboard.cashFlow.projectedCash, currency)}
+                  helper={`${projectionPeriodLabel(language, dashboard.cashFlow.period)} · ${formatDate(dashboard.cashFlow.startDate, language)} - ${formatDate(
+                    dashboard.cashFlow.endDate,
+                    language
+                  )}`}
+                  tone="good"
+                />
+                <DashboardMetric
+                  icon={Receipt}
+                  label={t(language, "billsInPeriod")}
+                  value={formatCurrency(dashboard.includedBillsTotal, currency)}
+                  helper={t(language, "upcomingUnpaidBills")}
+                />
+                <DashboardMetric
+                  icon={hasShortfall ? ShieldAlert : CheckCircle2}
+                  label={periodResultLabel}
+                  value={formatCurrency(periodResultValue, currency)}
+                  helper={hasShortfall ? t(language, "amountNeededToCoverBills") : t(language, "afterBillsSelectedPeriod")}
+                  tone={hasShortfall ? "danger" : "good"}
+                />
+                <DashboardMetric
+                  icon={Wallet}
+                  label={t(language, "needToEarnToday")}
+                  value={formatCurrency(dashboard.cashFlow.needToEarnToday, currency)}
+                  helper={t(language, "neededTodayToCoverPeriod")}
+                  tone={dashboard.cashFlow.needToEarnToday > 0 ? "warn" : "neutral"}
+                />
+              </div>
+
+              <div
+                className={clsx(
+                  "mt-4 rounded-[1.25rem] border p-4 text-sm font-semibold",
+                  hasShortfall ? "border-red-200 bg-red-500/10 text-red-700" : "border-brand-200 bg-brand-500/10 text-brand-700"
+                )}
+              >
+                <p className="text-xs font-black uppercase tracking-wide opacity-80">{t(language, "recommendedAction")}</p>
+                <p className="mt-1 text-base">{recommendedAction}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <SummaryItem icon={PiggyBank} label={t(language, "projectedCash")} value={formatCurrency(dashboard.cashFlow.projectedCash, currency)} tone="good" />
-              <SummaryItem icon={Receipt} label={t(language, "upcomingBills")} value={formatCurrency(dashboard.includedBillsTotal, currency)} />
-              <SummaryItem
-                icon={CheckCircle2}
-                label={t(language, "afterBills")}
-                value={formatCurrency(dashboard.cashFlow.projectedBalanceAfterBills, currency)}
-                tone={dashboard.cashFlow.projectedBalanceAfterBills < 0 ? "danger" : dashboard.cashFlow.projectedBalanceAfterBills <= 100 ? "warn" : "good"}
-              />
-              {dashboard.cashFlow.shortfall > 0 ? (
-                <SummaryItem icon={ShieldAlert} label={t(language, "shortfall")} value={formatCurrency(dashboard.cashFlow.shortfall, currency)} tone="danger" />
-              ) : null}
-            </div>
-            <div className="mt-4 border-t border-line pt-3">
+
+            <div className="p-5 sm:p-6">
               <button
                 className="flex w-full items-center justify-between gap-3 text-left text-sm font-semibold text-brand-700"
                 type="button"
@@ -405,24 +429,35 @@ export default function DashboardPage() {
                   </div>
                   <p className="text-2xl font-black text-ink">{formatCurrency(dashboard.nextBill.amount, currency)}</p>
                 </div>
-                <div className="grid gap-3 text-sm sm:grid-cols-3">
-                  <CompactMetric label={t(language, "projectedCash")} value={formatCurrency(dashboard.cashFlow.projectedCash, currency)} />
-                  <CompactMetric label={t(language, "upcomingBills")} value={formatCurrency(dashboard.includedBillsTotal, currency)} />
-                  <CompactMetric
-                    label={dashboard.cashFlow.shortfall > 0 ? t(language, "shortfall") : t(language, "remainingAfterBills")}
-                    value={formatCurrency(
+                <div className="rounded-[1.25rem] border border-line bg-neutral-50 p-4">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-semibold text-neutral-600">{t(language, "projectedCash")}</span>
+                    <span className="font-black text-ink">{formatCurrency(dashboard.cashFlow.projectedCash, currency)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+                    <span className="font-semibold text-neutral-600">{t(language, "billsInPeriod")}</span>
+                    <span className="font-black text-ink">{formatCurrency(dashboard.includedBillsTotal, currency)}</span>
+                  </div>
+                  <div className="mt-3 h-3 overflow-hidden rounded-md bg-neutral-100">
+                    <div
+                      className={clsx("h-full rounded-md", dashboard.cashFlow.shortfall > 0 ? "bg-fuel-500" : "bg-brand-600")}
+                      style={{ width: `${dashboard.billProgress}%` }}
+                    />
+                  </div>
+                  <p
+                    className={clsx(
+                      "mt-3 text-sm font-black",
+                      dashboard.cashFlow.shortfall > 0 ? "text-red-700" : "text-brand-700"
+                    )}
+                  >
+                    {dashboard.cashFlow.shortfall > 0 ? t(language, "shortfall") : t(language, "remainingAfterBills")}:{" "}
+                    {formatCurrency(
                       dashboard.cashFlow.shortfall > 0
                         ? dashboard.cashFlow.shortfall
                         : dashboard.cashFlow.projectedBalanceAfterBills,
                       currency
                     )}
-                  />
-                </div>
-                <div className="h-3 overflow-hidden rounded-md bg-neutral-100">
-                  <div
-                    className={clsx("h-full rounded-md", dashboard.cashFlow.shortfall > 0 ? "bg-fuel-500" : "bg-brand-600")}
-                    style={{ width: `${dashboard.billProgress}%` }}
-                  />
+                  </p>
                 </div>
               </div>
             ) : (
@@ -518,6 +553,48 @@ export default function DashboardPage() {
   );
 }
 
+function DashboardMetric({
+  label,
+  value,
+  helper,
+  icon: Icon,
+  tone = "neutral"
+}: {
+  label: string;
+  value: string;
+  helper?: string;
+  icon?: LucideIcon;
+  tone?: "neutral" | "good" | "warn" | "danger";
+}) {
+  return (
+    <div
+      className={clsx(
+        "rounded-[1.35rem] border border-line bg-neutral-50 p-4 shadow-sm",
+        tone === "good" && "border-brand-200",
+        tone === "warn" && "border-amber-200",
+        tone === "danger" && "border-red-200"
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-black uppercase tracking-wide text-neutral-500">{label}</p>
+        {Icon ? (
+          <span
+            className={clsx(
+              "icon-chip-sm",
+              tone === "warn" && "border-amber-200 bg-amber-50 text-amber-700",
+              tone === "danger" && "border-red-200 bg-red-50 text-red-700"
+            )}
+          >
+            <Icon size={19} aria-hidden="true" />
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-3 text-2xl font-black text-ink">{value}</p>
+      {helper ? <p className="mt-1 text-xs font-semibold text-neutral-500">{helper}</p> : null}
+    </div>
+  );
+}
+
 function SummaryItem({ label, value, icon: Icon, tone = "neutral" }: { label: string; value: string; icon?: LucideIcon; tone?: "neutral" | "good" | "warn" | "danger" }) {
   return (
     <div
@@ -538,15 +615,6 @@ function SummaryItem({ label, value, icon: Icon, tone = "neutral" }: { label: st
       </div>
       <p className="mt-3 text-xl font-black text-ink">{value}</p>
     </div>
-  );
-}
-
-function CompactMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <p className="rounded-[1.2rem] border border-line bg-neutral-50 p-3.5 shadow-sm">
-      <span className="block text-xs font-black uppercase tracking-wide text-neutral-500">{label}</span>
-      <span className="mt-1 block text-lg font-black text-ink">{value}</span>
-    </p>
   );
 }
 

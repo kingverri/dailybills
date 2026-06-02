@@ -8,7 +8,7 @@ import { plans, type PlanConfig } from "@/lib/plans";
 import { t } from "@/lib/i18n";
 
 export default function PricingPage() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const language = profile?.language ?? "en";
   const [message, setMessage] = useState("");
 
@@ -18,7 +18,7 @@ export default function PricingPage() {
         eyebrow={t(language, "pricing")}
         title={t(language, "chooseYourPlan")}
         subtitle={t(language, "pricingSubtitle")}
-        showBackToDashboard
+        showBackToDashboard={Boolean(user)}
         backToDashboardLabel={t(language, "backToDashboard")}
       />
 

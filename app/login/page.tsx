@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthCard } from "@/components/auth/auth-card";
+import { useAuth } from "@/components/auth-provider";
 import { normalizeLanguage, t } from "@/lib/i18n";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { Language } from "@/types/app";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,6 +30,12 @@ export default function LoginPage() {
 
     setLanguage(normalizeLanguage(storedLanguage ?? browserLanguage));
   }, []);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, router, user]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
