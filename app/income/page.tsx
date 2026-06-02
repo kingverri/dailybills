@@ -1,8 +1,7 @@
 "use client";
 
-import { BarChart3, ChevronDown, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState } from "@/components/empty-state";
@@ -14,7 +13,7 @@ import {
   calculateNetProfit
 } from "@/lib/financeCalculations";
 import { buildIncomeExportRows, exportToCSV, exportToXLSX } from "@/lib/exportUtils";
-import { formatCurrency, formatDate, toDateInputValue } from "@/lib/format";
+import { formatCurrency, formatDate, formatDurationFromDecimalHours, toDateInputValue } from "@/lib/format";
 import { incomeEntryTypeLabel, t } from "@/lib/i18n";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { DailyIncomeEntry, IncomeEntryType, Platform, Vehicle } from "@/types/app";
@@ -33,6 +32,11 @@ type IncomeForm = {
 type IncomeFilter = "all" | "actual" | "confirmed" | "extra_gig";
 type ExportFormat = "csv" | "xlsx" | "google";
 
+type MonthRange = {
+  startDate: string;
+  endExclusive: string;
+};
+
 const initialForm: IncomeForm = {
   date: toDateInputValue(),
   income_entry_type: "actual",
@@ -44,17 +48,43 @@ const initialForm: IncomeForm = {
   notes: ""
 };
 
+function getMonthRange(monthValue: string): MonthRange {
+  const [year, month] = monthValue.split("-").map(Number);
+  const startDate = `${monthValue}-01`;
+  const nextMonthDate = new Date(year, month, 1);
+
+  return {
+    startDate,
+    endExclusive: toDateInputValue(nextMonthDate)
+  };
+}
+
+function addMonthsToMonthValue(monthValue: string, offset: number) {
+  const [year, month] = monthValue.split("-").map(Number);
+  const date = new Date(year, month - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatSelectedMonth(monthValue: string, language: string) {
+  const [year, month] = monthValue.split("-").map(Number);
+  const locale = language === "pt" ? "pt-BR" : language === "es" ? "es-ES" : "en-US";
+
+  return new Intl.DateTimeFormat(locale, {
+    month: "long",
+    year: "numeric"
+  }).format(new Date(year, month - 1, 1));
+}
+
 export default function IncomePage() {
-  const router = useRouter();
   const { user, profile } = useAuth();
   const [entries, setEntries] = useState<DailyIncomeEntry[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [form, setForm] = useState<IncomeForm>(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(toDateInputValue().slice(0, 7));
   const [filter, setFilter] = useState<IncomeFilter>("all");
   const [expandedEntries, setExpandedEntries] = useState<string[]>([]);
-  const [exportMonth, setExportMonth] = useState(toDateInputValue().slice(0, 7));
   const [exportError, setExportError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -80,9 +110,34 @@ export default function IncomePage() {
     }),
     [gross, hours, miles, netProfit]
   );
+  const currentMonthValue = toDateInputValue().slice(0, 7);
+  const selectedMonthRange = useMemo(() => getMonthRange(selectedMonth), [selectedMonth]);
+  const monthlyEntries = useMemo(
+    () =>
+      entries.filter(
+        (entry) => entry.date >= selectedMonthRange.startDate && entry.date < selectedMonthRange.endExclusive
+      ),
+    [entries, selectedMonthRange.endExclusive, selectedMonthRange.startDate]
+  );
+  const monthSummary = useMemo(
+    () =>
+      monthlyEntries.reduce(
+        (summary, entry) => ({
+          gross: summary.gross + entry.gross_earnings,
+          net: summary.net + entry.net_profit,
+          miles: summary.miles + entry.miles_driven,
+          hours: summary.hours + entry.hours_worked,
+          gas: summary.gas + entry.gas_spent,
+          extra: summary.extra + Number((entry as { extra_expenses?: number | null }).extra_expenses ?? 0),
+          count: summary.count + 1
+        }),
+        { gross: 0, net: 0, miles: 0, hours: 0, gas: 0, extra: 0, count: 0 }
+      ),
+    [monthlyEntries]
+  );
   const filteredEntries = useMemo(
-    () => entries.filter((entry) => filter === "all" || entry.income_entry_type === filter),
-    [entries, filter]
+    () => monthlyEntries.filter((entry) => filter === "all" || entry.income_entry_type === filter),
+    [filter, monthlyEntries]
   );
 
   async function loadData() {
@@ -181,14 +236,10 @@ export default function IncomePage() {
       return;
     }
 
-    if (editingId) {
-      resetForm();
-      setShowForm(false);
-      await loadData();
-      return;
-    }
-
-    router.push("/dashboard");
+    setSelectedMonth(form.date.slice(0, 7));
+    resetForm();
+    setShowForm(false);
+    await loadData();
   }
 
   async function deleteEntry(id: string) {
@@ -204,17 +255,13 @@ export default function IncomePage() {
   function handleExport(format: ExportFormat) {
     setExportError("");
 
-    if (!exportMonth) {
+    if (!selectedMonth) {
       setExportError(t(language, "noRecordsFoundForPeriod"));
       return;
     }
 
-    const [year, month] = exportMonth.split("-").map(Number);
-    const startDate = `${exportMonth}-01`;
-    const nextMonthDate = new Date(year, month, 1);
-    const endExclusive = toDateInputValue(nextMonthDate);
     const selectedEntries = entries
-      .filter((entry) => entry.date >= startDate && entry.date < endExclusive)
+      .filter((entry) => entry.date >= selectedMonthRange.startDate && entry.date < selectedMonthRange.endExclusive)
       .sort((first, second) => first.date.localeCompare(second.date));
 
     if (selectedEntries.length === 0) {
@@ -223,7 +270,7 @@ export default function IncomePage() {
     }
 
     const rows = buildIncomeExportRows(selectedEntries, language);
-    const baseFilename = `dailybills-income-${exportMonth}`;
+    const baseFilename = `dailybills-income-${selectedMonth}`;
 
     if (format === "xlsx") {
       exportToXLSX(`${baseFilename}.xlsx`, rows, t(language, "income"));
@@ -244,19 +291,86 @@ export default function IncomePage() {
       />
 
       <div className="space-y-5">
-        <section className="card p-4">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-ink">{t(language, "exportIncome")}</h2>
+        <section className="card space-y-4 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-2">
+              <p className="field-label">{t(language, "selectedMonth")}</p>
+              <p className="text-xl font-semibold capitalize text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={() => setSelectedMonth((value) => addMonthsToMonthValue(value, -1))}
+              >
+                <ChevronLeft size={17} aria-hidden="true" />
+                {t(language, "previousMonth")}
+              </button>
+              <button className="btn-secondary" type="button" onClick={() => setSelectedMonth(currentMonthValue)}>
+                {t(language, "thisMonth")}
+              </button>
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={() => setSelectedMonth((value) => addMonthsToMonthValue(value, 1))}
+              >
+                {t(language, "nextMonth")}
+                <ChevronRight size={17} aria-hidden="true" />
+              </button>
+            </div>
           </div>
           <label className="block space-y-2 sm:max-w-xs">
-            <span className="field-label">{t(language, "selectMonth")}</span>
+            <span className="field-label">{t(language, "selectedMonth")}</span>
             <input
               className="field"
               type="month"
-              value={exportMonth}
-              onChange={(event) => setExportMonth(event.target.value)}
+              value={selectedMonth}
+              onChange={(event) => {
+                if (event.target.value) {
+                  setSelectedMonth(event.target.value);
+                }
+              }}
             />
           </label>
+          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "totalGross")}</span>
+              <span className="font-semibold text-ink">{formatCurrency(monthSummary.gross, currency)}</span>
+            </p>
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "netProfit")}</span>
+              <span className="font-semibold text-ink">{formatCurrency(monthSummary.net, currency)}</span>
+            </p>
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "miles")}</span>
+              <span className="font-semibold text-ink">{monthSummary.miles.toFixed(1)}</span>
+            </p>
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "hours")}</span>
+              <span className="font-semibold text-ink">{formatDurationFromDecimalHours(monthSummary.hours)}</span>
+            </p>
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "gasSpent")}</span>
+              <span className="font-semibold text-ink">{formatCurrency(monthSummary.gas, currency)}</span>
+            </p>
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "extraExpenses")}</span>
+              <span className="font-semibold text-ink">{formatCurrency(monthSummary.extra, currency)}</span>
+            </p>
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "entries")}</span>
+              <span className="font-semibold text-ink">{monthSummary.count}</span>
+            </p>
+          </div>
+        </section>
+
+        <section className="card p-4">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-ink">{t(language, "exportIncome")}</h2>
+            <p className="mt-1 text-sm text-neutral-600">
+              {t(language, "selectedMonth")}: {formatSelectedMonth(selectedMonth, language)}
+            </p>
+          </div>
           {exportError ? <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{exportError}</p> : null}
           <div className="mt-4 flex flex-wrap gap-2">
             <button className="btn-secondary" type="button" onClick={() => handleExport("csv")}>
@@ -417,7 +531,7 @@ export default function IncomePage() {
           {loading ? (
             <div className="card p-5 text-sm text-neutral-600">{t(language, "loadingIncome")}</div>
           ) : filteredEntries.length === 0 ? (
-            <EmptyState icon={BarChart3} title={t(language, "noIncomeEntriesYet")} body={t(language, "noIncomeHelper")}>
+            <EmptyState icon={BarChart3} title={t(language, "noIncomeEntriesFoundForMonth")} body={t(language, "noIncomeHelper")}>
               <button className="btn-primary" type="button" onClick={() => setShowForm(true)}>
                 <Plus size={17} aria-hidden="true" />
                 {t(language, "addIncome")}
@@ -464,11 +578,27 @@ export default function IncomePage() {
                   <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                   <p>
                     <span className="block text-neutral-500">{t(language, "hours")}</span>
-                    <span className="font-semibold">{entry.hours_worked}</span>
+                    <span className="font-semibold">{formatDurationFromDecimalHours(entry.hours_worked)}</span>
                   </p>
                   <p>
                     <span className="block text-neutral-500">{t(language, "gasSpent")}</span>
                     <span className="font-semibold">{formatCurrency(entry.gas_spent, currency)}</span>
+                  </p>
+                  <p>
+                    <span className="block text-neutral-500">{t(language, "estimatedGasCost")}</span>
+                    <span className="font-semibold">{formatCurrency(entry.estimated_gas_cost, currency)}</span>
+                  </p>
+                  <p>
+                    <span className="block text-neutral-500">{t(language, "earningsHour")}</span>
+                    <span className="font-semibold">
+                      {formatCurrency(calculateEarningsPerHour(entry.gross_earnings, entry.hours_worked), currency)}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="block text-neutral-500">{t(language, "earningsPerMile")}</span>
+                    <span className="font-semibold">
+                      {formatCurrency(calculateEarningsPerMile(entry.gross_earnings, entry.miles_driven), currency)}
+                    </span>
                   </p>
                   <p>
                     <span className="block text-neutral-500">{t(language, "netHour")}</span>
