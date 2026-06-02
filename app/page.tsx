@@ -41,6 +41,7 @@ const landingCopy = {
     navPricing: "Pricing",
     login: "Log in",
     startFree: "Start free",
+    plannerLabel: "Cash-flow planner",
     createAccount: "Create account",
     seeHow: "See how it works",
     heroBadge: "Built for workers with variable income",
@@ -57,6 +58,21 @@ const landingCopy = {
     workLog: "Work Log",
     monthlySummary: "Monthly summary",
     netThisWeek: "net this week",
+    cashFlow: "Cash flow",
+    rent: "Rent",
+    carInsurance: "Car insurance",
+    phone: "Phone",
+    billsLabel: "Bills",
+    incomeLabel: "Income",
+    tips: "Tips",
+    expenses: "Expenses",
+    safeToday: "Safe today",
+    needToday: "Need today",
+    mockDateShort: "Jun 3",
+    mockRentDate: "Jun 1",
+    mockCarInsuranceDate: "Jun 3",
+    mockPhoneDate: "Jun 7",
+    painBadge: "Real money problems",
     painTitle: "Working hard but still unsure where your money went?",
     painSubtitle:
       "Variable income makes money feel blurry. DailyBills turns scattered notes, due dates, gas, tips, and weekly work into one simple plan.",
@@ -134,6 +150,7 @@ const landingCopy = {
     navPricing: "Preços",
     login: "Entrar",
     startFree: "Começar grátis",
+    plannerLabel: "Planejador de fluxo",
     createAccount: "Criar conta",
     seeHow: "Ver como funciona",
     heroBadge: "Feito para trabalhadores com renda variável",
@@ -150,6 +167,21 @@ const landingCopy = {
     workLog: "Registro",
     monthlySummary: "Resumo mensal",
     netThisWeek: "líquido na semana",
+    cashFlow: "Fluxo de caixa",
+    rent: "Aluguel",
+    carInsurance: "Seguro do carro",
+    phone: "Celular",
+    billsLabel: "Contas",
+    incomeLabel: "Ganhos",
+    tips: "Gorjetas",
+    expenses: "Gastos",
+    safeToday: "Seguro hoje",
+    needToday: "Precisa hoje",
+    mockDateShort: "3 de jun",
+    mockRentDate: "1 de jun",
+    mockCarInsuranceDate: "3 de jun",
+    mockPhoneDate: "7 de jun",
+    painBadge: "Problemas reais de dinheiro",
     painTitle: "Trabalha muito, mas ainda não sabe para onde o dinheiro foi?",
     painSubtitle:
       "Renda variável deixa o dinheiro confuso. O DailyBills transforma notas soltas, vencimentos, gasolina, gorjetas e trabalho semanal em um plano simples.",
@@ -227,6 +259,7 @@ const landingCopy = {
     navPricing: "Precios",
     login: "Iniciar sesión",
     startFree: "Empezar gratis",
+    plannerLabel: "Planificador de flujo",
     createAccount: "Crear cuenta",
     seeHow: "Ver cómo funciona",
     heroBadge: "Hecho para trabajadores con ingresos variables",
@@ -243,6 +276,21 @@ const landingCopy = {
     workLog: "Registro",
     monthlySummary: "Resumen mensual",
     netThisWeek: "neto esta semana",
+    cashFlow: "Flujo de efectivo",
+    rent: "Renta",
+    carInsurance: "Seguro del carro",
+    phone: "Celular",
+    billsLabel: "Cuentas",
+    incomeLabel: "Ingresos",
+    tips: "Propinas",
+    expenses: "Gastos",
+    safeToday: "Seguro hoy",
+    needToday: "Necesitas hoy",
+    mockDateShort: "3 de jun",
+    mockRentDate: "1 de jun",
+    mockCarInsuranceDate: "3 de jun",
+    mockPhoneDate: "7 de jun",
+    painBadge: "Problemas reales de dinero",
     painTitle: "¿Trabajas mucho pero aún no sabes a dónde se fue tu dinero?",
     painSubtitle:
       "Los ingresos variables hacen que el dinero se vuelva confuso. DailyBills convierte notas sueltas, vencimientos, gasolina, propinas y trabajo semanal en un plan simple.",
@@ -389,7 +437,7 @@ export default function HomePage() {
             <span>
               <span className="block text-lg font-black leading-none">DailyBills</span>
               <span className="hidden text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-700 sm:block">
-                Cash-flow planner
+                {c.plannerLabel}
               </span>
             </span>
           </Link>
@@ -473,7 +521,7 @@ export default function HomePage() {
             <div>
               <span className="inline-flex items-center gap-2 rounded-full bg-emerald-400/12 px-4 py-2 text-sm font-black text-emerald-300">
                 <Activity size={17} aria-hidden="true" />
-                Real money problems
+                {c.painBadge}
               </span>
               <h2 className="mt-5 text-3xl font-black leading-tight sm:text-4xl">{c.painTitle}</h2>
               <p className="mt-4 text-lg leading-8 text-slate-300">{c.painSubtitle}</p>
@@ -713,11 +761,11 @@ function HeroMockup({ copy }: { copy: (typeof landingCopy)[Language] }) {
           <div className="mt-3 rounded-[1.5rem] border border-white/10 bg-white/[0.07] p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="font-black">{copy.upcomingBills}</p>
-              <span className="rounded-full bg-amber-400/15 px-3 py-1 text-xs font-black text-amber-200">Jun 3</span>
+              <span className="rounded-full bg-amber-400/15 px-3 py-1 text-xs font-black text-amber-200">{copy.mockDateShort}</span>
             </div>
             <div className="mt-4 space-y-3">
-              <BillRow name="Rent" amount="$1,275.00" percent="82%" color="bg-emerald-400" />
-              <BillRow name="Car insurance" amount="$274.16" percent="46%" color="bg-cyan-300" />
+              <BillRow name={copy.rent} amount="$1,275.00" percent="82%" color="bg-emerald-400" />
+              <BillRow name={copy.carInsurance} amount="$274.16" percent="46%" color="bg-cyan-300" />
             </div>
           </div>
 
@@ -732,7 +780,7 @@ function HeroMockup({ copy }: { copy: (typeof landingCopy)[Language] }) {
               <BarChart3 size={24} className="text-cyan-200" aria-hidden="true" />
               <p className="mt-3 text-xs font-black uppercase tracking-wide text-slate-300">{copy.monthlySummary}</p>
               <p className="mt-1 text-2xl font-black">$2,940</p>
-              <p className="text-xs font-bold text-cyan-200">cash flow</p>
+              <p className="text-xs font-bold text-cyan-200">{copy.cashFlow}</p>
             </div>
           </div>
         </div>
@@ -793,9 +841,9 @@ function ProductPreview({ copy }: { copy: (typeof landingCopy)[Language] }) {
             <h3 className="font-black text-slate-950">{copy.upcomingBills}</h3>
             <Receipt size={22} className="text-emerald-600" aria-hidden="true" />
           </div>
-          <BillRowLight name="Rent" amount="$1,275.00" due="Jun 1" />
-          <BillRowLight name="Car insurance" amount="$274.16" due="Jun 3" />
-          <BillRowLight name="Phone" amount="$86.00" due="Jun 7" />
+          <BillRowLight name={copy.rent} amount="$1,275.00" due={copy.mockRentDate} />
+          <BillRowLight name={copy.carInsurance} amount="$274.16" due={copy.mockCarInsuranceDate} />
+          <BillRowLight name={copy.phone} amount="$86.00" due={copy.mockPhoneDate} />
         </div>
         <div className="rounded-[1.5rem] border border-slate-100 bg-slate-950 p-4 text-white">
           <ClipboardList size={25} className="text-emerald-300" aria-hidden="true" />
