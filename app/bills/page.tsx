@@ -1,12 +1,23 @@
 "use client";
 
-import { CheckCircle2, ChevronDown, ChevronUp, CircleDollarSign, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  CircleDollarSign,
+  Pencil,
+  Plus,
+  Trash2
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { billCategories, billStatuses } from "@/lib/constants";
+import { expandRecurringBillsWithinPeriod, type BillOccurrence } from "@/lib/financeCalculations";
 import { formatCurrency, formatDate, formatMonthYear, toDateInputValue } from "@/lib/format";
 import { billRecurrenceLabel, t } from "@/lib/i18n";
 import { canAddBill, getCurrentPlan } from "@/lib/planLimits";
@@ -28,6 +39,13 @@ type BillForm = {
 
 type BillFilter = "all" | "unpaid" | "paid" | "due_soon";
 type BillSort = "due_date" | "amount";
+
+type MonthRange = {
+  start: Date;
+  end: Date;
+  startDate: string;
+  endDate: string;
+};
 
 const initialForm: BillForm = {
   name: "",
@@ -72,6 +90,35 @@ function billRecurrenceSummary(bill: Bill, language: string) {
   return `${base} · ${t(language, "noEndDate")}`;
 }
 
+function getMonthRange(monthValue: string): MonthRange {
+  const [year, month] = monthValue.split("-").map(Number);
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+
+  return {
+    start,
+    end,
+    startDate: toDateInputValue(start),
+    endDate: toDateInputValue(end)
+  };
+}
+
+function addMonthsToMonthValue(monthValue: string, offset: number) {
+  const [year, month] = monthValue.split("-").map(Number);
+  const date = new Date(year, month - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatSelectedMonth(monthValue: string, language: string) {
+  const [year, month] = monthValue.split("-").map(Number);
+  const locale = language === "pt" ? "pt-BR" : language === "es" ? "es-ES" : "en-US";
+
+  return new Intl.DateTimeFormat(locale, {
+    month: "long",
+    year: "numeric"
+  }).format(new Date(year, month - 1, 1));
+}
+
 export default function BillsPage() {
   const router = useRouter();
   const { user, profile } = useAuth();
@@ -79,6 +126,7 @@ export default function BillsPage() {
   const [form, setForm] = useState<BillForm>(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(toDateInputValue().slice(0, 7));
   const [filter, setFilter] = useState<BillFilter>("all");
   const [sortBy, setSortBy] = useState<BillSort>("due_date");
   const [loading, setLoading] = useState(true);
@@ -91,13 +139,32 @@ export default function BillsPage() {
   const canCreateBill = canAddBill(currentPlan, bills.length);
   const isRepeatingBill = form.recurrence !== "one-time";
   const repeatFrequencyValue = repeatFrequencyOptions.includes(form.recurrence) ? form.recurrence : "monthly";
+  const currentMonthValue = toDateInputValue().slice(0, 7);
+  const selectedMonthRange = useMemo(() => getMonthRange(selectedMonth), [selectedMonth]);
+  const monthlyBillOccurrences = useMemo(
+    () => expandRecurringBillsWithinPeriod(bills, selectedMonthRange.start, selectedMonthRange.end),
+    [bills, selectedMonthRange.end, selectedMonthRange.start]
+  );
+  const monthSummary = useMemo(
+    () =>
+      monthlyBillOccurrences.reduce(
+        (summary, bill) => ({
+          total: summary.total + bill.amount,
+          paid: summary.paid + (bill.status === "paid" ? bill.amount : 0),
+          unpaid: summary.unpaid + (bill.status === "unpaid" ? bill.amount : 0),
+          count: summary.count + 1
+        }),
+        { total: 0, paid: 0, unpaid: 0, count: 0 }
+      ),
+    [monthlyBillOccurrences]
+  );
   const sortedBills = useMemo(() => {
     const today = toDateInputValue(new Date());
     const dueSoonEnd = new Date();
     dueSoonEnd.setDate(dueSoonEnd.getDate() + 7);
     const dueSoonEndValue = toDateInputValue(dueSoonEnd);
 
-    return bills
+    return monthlyBillOccurrences
       .filter((bill) => {
         if (filter === "unpaid") {
           return bill.status === "unpaid";
@@ -106,7 +173,7 @@ export default function BillsPage() {
           return bill.status === "paid";
         }
         if (filter === "due_soon") {
-          return bill.status === "unpaid" && bill.due_date >= today && bill.due_date <= dueSoonEndValue;
+          return bill.status === "unpaid" && bill.occurrenceDate >= today && bill.occurrenceDate <= dueSoonEndValue;
         }
         return true;
       })
@@ -114,9 +181,9 @@ export default function BillsPage() {
         if (sortBy === "amount") {
           return Number(b.amount) - Number(a.amount);
         }
-        return a.due_date.localeCompare(b.due_date);
+        return a.occurrenceDate.localeCompare(b.occurrenceDate);
       });
-  }, [bills, filter, sortBy]);
+  }, [filter, monthlyBillOccurrences, sortBy]);
 
   async function loadBills() {
     if (!user) {
@@ -242,6 +309,7 @@ export default function BillsPage() {
   }
 
   async function toggleStatus(bill: Bill) {
+    // Future improvement: track paid/unpaid status per recurring occurrence.
     const nextStatus: BillStatus = bill.status === "paid" ? "unpaid" : "paid";
     const supabase = getSupabaseClient();
     const { error: updateError } = await supabase.from("bills").update({ status: nextStatus }).eq("id", bill.id);
@@ -411,6 +479,67 @@ export default function BillsPage() {
           ) : null}
         </section>
 
+        <section className="card space-y-4 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="space-y-2">
+              <p className="field-label">{t(language, "selectedMonth")}</p>
+              <p className="text-xl font-semibold capitalize text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={() => setSelectedMonth((value) => addMonthsToMonthValue(value, -1))}
+              >
+                <ChevronLeft size={17} aria-hidden="true" />
+                {t(language, "previousMonth")}
+              </button>
+              <button className="btn-secondary" type="button" onClick={() => setSelectedMonth(currentMonthValue)}>
+                {t(language, "thisMonth")}
+              </button>
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={() => setSelectedMonth((value) => addMonthsToMonthValue(value, 1))}
+              >
+                {t(language, "nextMonth")}
+                <ChevronRight size={17} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+          <label className="block space-y-2 sm:max-w-xs">
+            <span className="field-label">{t(language, "selectedMonth")}</span>
+            <input
+              className="field"
+              type="month"
+              value={selectedMonth}
+              onChange={(event) => {
+                if (event.target.value) {
+                  setSelectedMonth(event.target.value);
+                }
+              }}
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "totalForMonth")}</span>
+              <span className="font-semibold text-ink">{formatCurrency(monthSummary.total, currency)}</span>
+            </p>
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "paid")}</span>
+              <span className="font-semibold text-ink">{formatCurrency(monthSummary.paid, currency)}</span>
+            </p>
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "unpaid")}</span>
+              <span className="font-semibold text-ink">{formatCurrency(monthSummary.unpaid, currency)}</span>
+            </p>
+            <p className="rounded-xl border border-line bg-neutral-50 p-3">
+              <span className="block text-neutral-500">{t(language, "bills")}</span>
+              <span className="font-semibold text-ink">{monthSummary.count}</span>
+            </p>
+          </div>
+        </section>
+
         <section className="space-y-3">
           <div className="card space-y-3 p-3">
             <div className="flex gap-2 overflow-x-auto pb-1">
@@ -441,20 +570,20 @@ export default function BillsPage() {
           {loading ? (
             <div className="card p-5 text-sm text-neutral-600">{t(language, "loadingBills")}</div>
           ) : sortedBills.length === 0 ? (
-            <EmptyState icon={CircleDollarSign} title={t(language, "noBillsYet")} body={t(language, "noBillsHelper")}>
+            <EmptyState icon={CircleDollarSign} title={t(language, "noBillsFoundForMonth")} body={t(language, "noBillsHelper")}>
               <button className="btn-primary" type="button" onClick={() => setShowForm(true)}>
                 <Plus size={17} aria-hidden="true" />
                 {t(language, "addBill")}
               </button>
             </EmptyState>
           ) : (
-            sortedBills.map((bill) => (
-              <article key={bill.id} className="card p-3">
+            sortedBills.map((bill: BillOccurrence) => (
+              <article key={`${bill.id}:${bill.occurrenceDate}`} className="card p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold text-ink">{bill.name}</p>
                     <p className="text-sm text-neutral-600">
-                      {t(language, "due")} {formatDate(bill.due_date, language)}
+                      {t(language, "due")} {formatDate(bill.occurrenceDate, language)}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
                       <span className="rounded-full bg-neutral-50 px-2 py-1 text-neutral-600">
@@ -462,6 +591,9 @@ export default function BillsPage() {
                       </span>
                       <span className="rounded-full bg-neutral-50 px-2 py-1 text-neutral-600">
                         {billRecurrenceSummary(bill, language)}
+                      </span>
+                      <span className="rounded-full bg-neutral-50 px-2 py-1 text-neutral-600">
+                        {bill.category}
                       </span>
                     </div>
                   </div>
