@@ -26,13 +26,17 @@ import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { billCategories, billStatuses } from "@/lib/constants";
-import { expandRecurringBillsWithinPeriod, type BillOccurrence } from "@/lib/financeCalculations";
+import {
+  expandRecurringBillsWithinPeriod,
+  mergeBillOccurrenceStatuses,
+  type BillOccurrence
+} from "@/lib/financeCalculations";
 import { formatCurrency, formatDate, formatMonthYear, toDateInputValue } from "@/lib/format";
 import { billRecurrenceLabel, t } from "@/lib/i18n";
 import { canAddBill, getCurrentPlan } from "@/lib/planLimits";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
-import type { Bill, BillCategory, BillRecurrence, BillRepeatUntilType, BillStatus } from "@/types/app";
+import type { Bill, BillCategory, BillOccurrenceStatus, BillRecurrence, BillRepeatUntilType, BillStatus } from "@/types/app";
 
 type BillForm = {
   name: string;
@@ -186,6 +190,7 @@ export default function BillsPage() {
   const router = useRouter();
   const { user, profile } = useAuth();
   const [bills, setBills] = useState<Bill[]>([]);
+  const [billOccurrenceStatuses, setBillOccurrenceStatuses] = useState<BillOccurrenceStatus[]>([]);
   const [form, setForm] = useState<BillForm>(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -206,8 +211,12 @@ export default function BillsPage() {
   const currentMonthValue = toDateInputValue().slice(0, 7);
   const selectedMonthRange = useMemo(() => getMonthRange(selectedMonth), [selectedMonth]);
   const monthlyBillOccurrences = useMemo(
-    () => expandRecurringBillsWithinPeriod(bills, selectedMonthRange.start, selectedMonthRange.end),
-    [bills, selectedMonthRange.end, selectedMonthRange.start]
+    () =>
+      mergeBillOccurrenceStatuses(
+        expandRecurringBillsWithinPeriod(bills, selectedMonthRange.start, selectedMonthRange.end),
+        billOccurrenceStatuses
+      ),
+    [billOccurrenceStatuses, bills, selectedMonthRange.end, selectedMonthRange.start]
   );
   const monthSummary = useMemo(
     () =>
@@ -255,16 +264,22 @@ export default function BillsPage() {
 
     setLoading(true);
     const supabase = getSupabaseClient();
-    const { data, error: loadError } = await supabase
-      .from("bills")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("due_date", { ascending: true });
+    const [billResult, occurrenceResult] = await Promise.all([
+      supabase
+        .from("bills")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("due_date", { ascending: true }),
+      supabase.from("bill_occurrences").select("*").eq("user_id", user.id)
+    ]);
+
+    const loadError = billResult.error ?? occurrenceResult.error;
 
     if (loadError) {
       setError(loadError.message);
     } else {
-      setBills(data ?? []);
+      setBills(billResult.data ?? []);
+      setBillOccurrenceStatuses(occurrenceResult.data ?? []);
     }
     setLoading(false);
   }
@@ -369,18 +384,42 @@ export default function BillsPage() {
       return;
     }
     setBills((items) => items.filter((item) => item.id !== id));
+    setBillOccurrenceStatuses((items) => items.filter((item) => item.bill_id !== id));
   }
 
-  async function toggleStatus(bill: Bill) {
-    // Future improvement: track paid/unpaid status per recurring occurrence.
-    const nextStatus: BillStatus = bill.status === "paid" ? "unpaid" : "paid";
-    const supabase = getSupabaseClient();
-    const { error: updateError } = await supabase.from("bills").update({ status: nextStatus }).eq("id", bill.id);
-    if (updateError) {
-      setError(updateError.message);
+  async function toggleStatus(bill: BillOccurrence) {
+    if (!user) {
+      setError(t(language, "loginAgain"));
       return;
     }
-    setBills((items) => items.map((item) => (item.id === bill.id ? { ...item, status: nextStatus } : item)));
+
+    const nextStatus: BillStatus = bill.status === "paid" ? "unpaid" : "paid";
+    const supabase = getSupabaseClient();
+    const payload = {
+      user_id: user.id,
+      bill_id: bill.id,
+      occurrence_date: bill.occurrenceDate,
+      status: nextStatus,
+      paid_at: nextStatus === "paid" ? new Date().toISOString() : null
+    };
+    const { data, error: updateError } = await supabase
+      .from("bill_occurrences")
+      .upsert(payload, { onConflict: "user_id,bill_id,occurrence_date" })
+      .select()
+      .single();
+
+    if (updateError) {
+      setError(t(language, "couldNotUpdateBillStatus"));
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const nextOccurrence = data ?? ({ ...payload, id: "", created_at: now, updated_at: now } as BillOccurrenceStatus);
+    setBillOccurrenceStatuses((items) => {
+      const key = `${bill.id}:${bill.occurrenceDate}`;
+      const withoutCurrent = items.filter((item) => `${item.bill_id}:${item.occurrence_date}` !== key);
+      return [...withoutCurrent, nextOccurrence];
+    });
   }
 
   return (

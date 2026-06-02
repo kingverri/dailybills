@@ -35,11 +35,12 @@ import { formatCurrency, formatDate, toDateInputValue } from "@/lib/format";
 import { projectionPeriodLabel, t } from "@/lib/i18n";
 import { canUseCustomProjection, getCurrentPlan } from "@/lib/planLimits";
 import { getSupabaseClient } from "@/lib/supabase";
-import type { Bill, DailyIncomeEntry, PaySchedule, Vehicle } from "@/types/app";
+import type { Bill, BillOccurrenceStatus, DailyIncomeEntry, PaySchedule, Vehicle } from "@/types/app";
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
   const [bills, setBills] = useState<Bill[]>([]);
+  const [billOccurrenceStatuses, setBillOccurrenceStatuses] = useState<BillOccurrenceStatus[]>([]);
   const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
   const [entries, setEntries] = useState<DailyIncomeEntry[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -86,20 +87,22 @@ export default function DashboardPage() {
 
     setLoading(true);
     const supabase = getSupabaseClient();
-    const [billResult, scheduleResult, entryResult, vehicleResult] = await Promise.all([
+    const [billResult, occurrenceResult, scheduleResult, entryResult, vehicleResult] = await Promise.all([
       supabase.from("bills").select("*").eq("user_id", user.id),
+      supabase.from("bill_occurrences").select("*").eq("user_id", user.id),
       supabase.from("pay_schedules").select("*").eq("user_id", user.id),
       supabase.from("daily_income_entries").select("*").eq("user_id", user.id),
       supabase.from("vehicles").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
     ]);
 
     const firstError =
-      billResult.error ?? scheduleResult.error ?? entryResult.error ?? vehicleResult.error;
+      billResult.error ?? occurrenceResult.error ?? scheduleResult.error ?? entryResult.error ?? vehicleResult.error;
 
     if (firstError) {
       setError(firstError.message);
     } else {
       setBills(billResult.data ?? []);
+      setBillOccurrenceStatuses(occurrenceResult.data ?? []);
       setPaySchedules(scheduleResult.data ?? []);
       setEntries(entryResult.data ?? []);
       setVehicles(vehicleResult.data ?? []);
@@ -116,12 +119,13 @@ export default function DashboardPage() {
     const cashFlow = calculateCashFlowProjectionForPeriod({
       currentBalance,
       bills,
+      billOccurrenceStatuses,
       paySchedules,
       incomeEntries: entries,
       projectionRange,
       asOf
     });
-    const summary = calculateMonthlySummary(entries, bills, paySchedules, currentBalance, asOf);
+    const summary = calculateMonthlySummary(entries, bills, paySchedules, currentBalance, asOf, billOccurrenceStatuses);
     const includedBillsTotal = cashFlow.bills.reduce((sum, bill) => sum + Number(bill.amount ?? 0), 0);
     const billProgress =
       includedBillsTotal > 0
@@ -136,7 +140,7 @@ export default function DashboardPage() {
       summary,
       includedBills: cashFlow.bills
     };
-  }, [asOf, bills, currentBalance, entries, paySchedules, projectionRange]);
+  }, [asOf, billOccurrenceStatuses, bills, currentBalance, entries, paySchedules, projectionRange]);
 
   const riskCopy = {
     low: {

@@ -1,5 +1,13 @@
 import { daysOfWeek } from "@/lib/constants";
-import type { Bill, DailyIncomeEntry, DriverLog, PaySchedule, RiskLevel, WeeklySettlementDay } from "@/types/app";
+import type {
+  Bill,
+  BillOccurrenceStatus,
+  DailyIncomeEntry,
+  DriverLog,
+  PaySchedule,
+  RiskLevel,
+  WeeklySettlementDay
+} from "@/types/app";
 
 type DateLike = string | Date;
 
@@ -43,6 +51,7 @@ export type ProjectionPeriodRange = {
 export type ProjectionCashFlowInput = {
   currentBalance: number;
   bills: Bill[];
+  billOccurrenceStatuses?: BillOccurrenceStatus[];
   paySchedules: PaySchedule[];
   incomeEntries?: DailyIncomeEntry[];
   period?: ProjectionPeriod;
@@ -232,6 +241,7 @@ export function expandRecurringBillsWithinPeriod(bills: Bill[], from: DateLike, 
       if (date >= firstDueDate && (!repeatEndDate || date <= repeatEndDate) && isBetweenInclusive(date, start, end)) {
         occurrences.push({
           ...bill,
+          status: bill.recurrence === "one-time" || bill.recurrence === "custom" ? bill.status : "unpaid",
           originalDueDate,
           occurrenceDate: toIsoDate(date),
           daysRemaining: daysBetween(start, date),
@@ -296,13 +306,39 @@ export function expandRecurringBillsWithinPeriod(bills: Bill[], from: DateLike, 
   });
 }
 
+export function mergeBillOccurrenceStatuses(
+  occurrences: BillOccurrence[],
+  occurrenceStatuses: BillOccurrenceStatus[] = []
+) {
+  const statusByOccurrence = new Map(
+    occurrenceStatuses.map((status) => [`${status.bill_id}:${status.occurrence_date}`, status.status])
+  );
+
+  return occurrences.map((occurrence) => {
+    const status = statusByOccurrence.get(`${occurrence.id}:${occurrence.occurrenceDate}`);
+
+    if (status) {
+      return { ...occurrence, status };
+    }
+
+    return {
+      ...occurrence,
+      status: occurrence.recurrence === "one-time" || occurrence.recurrence === "custom" ? occurrence.status : "unpaid"
+    };
+  });
+}
+
 export function calculateUpcomingBills(
   bills: Bill[],
+  billOccurrenceStatuses: BillOccurrenceStatus[] = [],
   from: DateLike = new Date(),
   horizonDays = 45
 ): BillOccurrence[] {
   const start = startOfDay(from);
-  return expandRecurringBillsWithinPeriod(bills, start, addDays(start, horizonDays)).filter(
+  return mergeBillOccurrenceStatuses(
+    expandRecurringBillsWithinPeriod(bills, start, addDays(start, horizonDays)),
+    billOccurrenceStatuses
+  ).filter(
     (bill) => bill.status === "unpaid"
   );
 }
@@ -471,9 +507,13 @@ function resolveProjectionRange({
 
 export function getBillsWithinProjectionPeriod(
   bills: Bill[],
-  projectionRange: ProjectionPeriodRange = getDefaultMonthlyProjectionRange()
+  projectionRange: ProjectionPeriodRange = getDefaultMonthlyProjectionRange(),
+  billOccurrenceStatuses: BillOccurrenceStatus[] = []
 ): BillOccurrence[] {
-  return expandRecurringBillsWithinPeriod(bills, projectionRange.start, projectionRange.end).filter(
+  return mergeBillOccurrenceStatuses(
+    expandRecurringBillsWithinPeriod(bills, projectionRange.start, projectionRange.end),
+    billOccurrenceStatuses
+  ).filter(
     (bill) => bill.status === "unpaid"
   );
 }
@@ -524,9 +564,10 @@ export function calculateProjectedCashForPeriod({
 
 export function calculateRequiredBillsForPeriod(
   bills: Bill[],
-  projectionRange: ProjectionPeriodRange = getDefaultMonthlyProjectionRange()
+  projectionRange: ProjectionPeriodRange = getDefaultMonthlyProjectionRange(),
+  billOccurrenceStatuses: BillOccurrenceStatus[] = []
 ) {
-  return getBillsWithinProjectionPeriod(bills, projectionRange).reduce(
+  return getBillsWithinProjectionPeriod(bills, projectionRange, billOccurrenceStatuses).reduce(
     (sum, bill) => sum + normalizeAmount(bill.amount),
     0
   );
@@ -547,6 +588,7 @@ export function calculateShortfallForPeriod(projectedCash: number, requiredBills
 export function calculateNeedToEarnForPeriod({
   currentBalance,
   bills,
+  billOccurrenceStatuses = [],
   paySchedules,
   incomeEntries = [],
   period = "this_month",
@@ -564,14 +606,14 @@ export function calculateNeedToEarnForPeriod({
     projectionRange: range,
     asOf
   });
-  const requiredBills = calculateRequiredBillsForPeriod(bills, range);
+  const requiredBills = calculateRequiredBillsForPeriod(bills, range, billOccurrenceStatuses);
   const shortfall = calculateShortfallForPeriod(projectedCash, requiredBills);
 
   if (shortfall <= 0) {
     return 0;
   }
 
-  const urgentBill = getBillsWithinProjectionPeriod(bills, range)[0];
+  const urgentBill = getBillsWithinProjectionPeriod(bills, range, billOccurrenceStatuses)[0];
   return shortfall / Math.max(1, urgentBill?.daysRemaining || 1);
 }
 
@@ -582,6 +624,7 @@ export function calculateRiskLevelForPeriod(projectedBalanceAfterBills: number):
 export function calculateCashFlowProjectionForPeriod({
   currentBalance,
   bills,
+  billOccurrenceStatuses = [],
   paySchedules,
   incomeEntries = [],
   period = "this_month",
@@ -592,7 +635,7 @@ export function calculateCashFlowProjectionForPeriod({
   emergencyBuffer = 0
 }: ProjectionCashFlowInput): ProjectionCashFlow {
   const range = resolveProjectionRange({ period, projectionRange, startDate, endDate, asOf });
-  const periodBills = getBillsWithinProjectionPeriod(bills, range);
+  const periodBills = getBillsWithinProjectionPeriod(bills, range, billOccurrenceStatuses);
 
   /*
    * The selected projection period is the source of truth for Safe to Spend calculations.
@@ -626,6 +669,7 @@ export function calculateCashFlowProjectionForPeriod({
     needToEarnToday: calculateNeedToEarnForPeriod({
       currentBalance,
       bills,
+      billOccurrenceStatuses,
       paySchedules,
       incomeEntries,
       projectionRange: range,
@@ -654,7 +698,7 @@ export function calculateSafeToSpendToday({
   );
   const nextIncomeDate = futureIncome[0]?.date;
   const reserveThrough = nextIncomeDate ? startOfDay(nextIncomeDate) : end;
-  const requiredReserve = calculateUpcomingBills(bills, start, horizonDays)
+  const requiredReserve = calculateUpcomingBills(bills, [], start, horizonDays)
     .filter((bill) => (nextIncomeDate ? bill.occurrenceDate < nextIncomeDate : bill.occurrenceDate >= todayIso))
     .filter((bill) => startOfDay(bill.occurrenceDate) <= reserveThrough)
     .reduce((sum, bill) => sum + normalizeAmount(bill.amount), 0);
@@ -670,7 +714,7 @@ export function calculateDailyEarningTarget({
   asOf = new Date()
 }: DailyTargetInput) {
   const start = startOfDay(asOf);
-  const nextBill = calculateUpcomingBills(bills, start, 60)[0];
+  const nextBill = calculateUpcomingBills(bills, [], start, 60)[0];
 
   if (!nextBill) {
     return 0;
@@ -917,7 +961,8 @@ export function calculateMonthlySummary(
   bills: Bill[],
   paySchedules: PaySchedule[] = [],
   currentBalance = 0,
-  asOf: DateLike = new Date()
+  asOf: DateLike = new Date(),
+  billOccurrenceStatuses: BillOccurrenceStatus[] = []
 ): MonthlySummary {
   const today = startOfDay(asOf);
   const start = monthStart(today);
@@ -927,7 +972,10 @@ export function calculateMonthlySummary(
     const date = startOfDay(entry.date);
     return isBetweenInclusive(date, start, today);
   });
-  const monthBillOccurrences = expandRecurringBillsWithinPeriod(bills, start, end);
+  const monthBillOccurrences = mergeBillOccurrenceStatuses(
+    expandRecurringBillsWithinPeriod(bills, start, end),
+    billOccurrenceStatuses
+  );
   const totalIncome = monthEntriesToDate.reduce((sum, entry) => sum + normalizeAmount(entry.gross_earnings), 0);
   const totalGasCost = monthEntriesToDate.reduce(
     (sum, entry) => sum + (normalizeAmount(entry.gas_spent) || normalizeAmount(entry.estimated_gas_cost)),

@@ -80,6 +80,17 @@ export type Bill = {
   updated_at: string;
 };
 
+export type BillOccurrenceStatus = {
+  id: string;
+  user_id: string;
+  bill_id: string;
+  occurrence_date: string;
+  status: BillStatus;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type GasStation = {
   id: string;
   user_id: string;

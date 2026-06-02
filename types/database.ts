@@ -1,5 +1,6 @@
 import type {
   Bill,
+  BillOccurrenceStatus,
   DailyIncomeEntry,
   DriverLog,
   GasStation,
@@ -27,6 +28,16 @@ export type Database = {
         Row: Bill;
         Insert: Partial<Omit<Bill, "id" | "created_at" | "updated_at">> & { user_id: string; name: string; amount: number; due_date: string };
         Update: Partial<Omit<Bill, "id" | "user_id" | "created_at" | "updated_at">>;
+        Relationships: [];
+      };
+      bill_occurrences: {
+        Row: BillOccurrenceStatus;
+        Insert: Partial<Omit<BillOccurrenceStatus, "id" | "created_at" | "updated_at">> & {
+          user_id: string;
+          bill_id: string;
+          occurrence_date: string;
+        };
+        Update: Partial<Omit<BillOccurrenceStatus, "id" | "user_id" | "bill_id" | "occurrence_date" | "created_at" | "updated_at">>;
         Relationships: [];
       };
       gas_stations: {
