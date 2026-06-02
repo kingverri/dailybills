@@ -99,12 +99,15 @@ export type MonthlySummary = {
 
 export type DriverLogMetrics = {
   hoursWorked: number;
+  totalEarnings: number;
   earningsPerHour: number;
   earningsPerMile: number;
   gallonsBought: number;
   netProfit: number;
   netProfitPerHour: number;
   netProfitPerMile: number;
+  grossPerStop: number;
+  netPerStop: number;
 };
 
 export type DriverWeekRange = {
@@ -118,17 +121,22 @@ export type WeeklyDriverSummary = {
   startDate: string;
   endDate: string;
   totalGrossEarnings: number;
+  totalTipsReceived: number;
+  totalEarnings: number;
   totalMiles: number;
   totalHoursWorked: number;
   totalGasSpent: number;
   averageGasPricePaid: number;
   totalGallonsBought: number;
   totalExtraExpenses: number;
+  totalStopsCompleted: number;
   netProfit: number;
   grossPerHour: number;
   netPerHour: number;
   grossPerMile: number;
   netPerMile: number;
+  grossPerStop: number;
+  netPerStop: number;
   workDaysLogged: number;
 };
 
@@ -773,28 +781,47 @@ export function calculateGallonsBought(gasSpent: number, gasPricePerGallon: numb
   return spent / price;
 }
 
-export function calculateDriverLogNetProfit(grossEarnings: number, gasSpent: number, extraExpenses: number) {
-  return normalizeAmount(grossEarnings) - normalizeAmount(gasSpent) - normalizeAmount(extraExpenses);
+export function calculateDriverLogNetProfit(
+  grossEarnings: number,
+  gasSpent: number,
+  extraExpenses: number,
+  tipsReceived = 0
+) {
+  return normalizeAmount(grossEarnings) + normalizeAmount(tipsReceived) - normalizeAmount(gasSpent) - normalizeAmount(extraExpenses);
 }
 
 export function calculateDriverLogMetrics(log: Pick<
   DriverLog,
-  "start_time" | "end_time" | "miles_driven" | "gross_earnings" | "gas_spent" | "gas_price_per_gallon" | "extra_expenses"
+  | "start_time"
+  | "end_time"
+  | "miles_driven"
+  | "gross_earnings"
+  | "tips_received"
+  | "gas_spent"
+  | "gas_price_per_gallon"
+  | "extra_expenses"
+  | "stops_completed"
 >): DriverLogMetrics {
   const hoursWorked = calculateWorkedHours(log.start_time, log.end_time);
   const miles = normalizeAmount(log.miles_driven);
   const gross = normalizeAmount(log.gross_earnings);
+  const tips = normalizeAmount(log.tips_received);
+  const totalEarnings = gross + tips;
+  const stops = normalizeAmount(log.stops_completed);
   const gallonsBought = calculateGallonsBought(log.gas_spent, log.gas_price_per_gallon);
-  const netProfit = calculateDriverLogNetProfit(gross, log.gas_spent, log.extra_expenses);
+  const netProfit = calculateDriverLogNetProfit(gross, log.gas_spent, log.extra_expenses, tips);
 
   return {
     hoursWorked,
-    earningsPerHour: calculateEarningsPerHour(gross, hoursWorked),
-    earningsPerMile: calculateEarningsPerMile(gross, miles),
+    totalEarnings,
+    earningsPerHour: calculateEarningsPerHour(totalEarnings, hoursWorked),
+    earningsPerMile: calculateEarningsPerMile(totalEarnings, miles),
     gallonsBought,
     netProfit,
     netProfitPerHour: calculateEarningsPerHour(netProfit, hoursWorked),
-    netProfitPerMile: calculateEarningsPerMile(netProfit, miles)
+    netProfitPerMile: calculateEarningsPerMile(netProfit, miles),
+    grossPerStop: stops > 0 ? totalEarnings / stops : 0,
+    netPerStop: stops > 0 ? netProfit / stops : 0
   };
 }
 
@@ -843,28 +870,36 @@ export function calculateWeeklyDriverSummaryForRange(logs: DriverLog[], range: D
     metrics: calculateDriverLogMetrics(log)
   }));
   const totalGrossEarnings = weekLogs.reduce((sum, log) => sum + normalizeAmount(log.gross_earnings), 0);
+  const totalTipsReceived = weekLogs.reduce((sum, log) => sum + normalizeAmount(log.tips_received), 0);
+  const totalEarnings = totalGrossEarnings + totalTipsReceived;
   const totalMiles = weekLogs.reduce((sum, log) => sum + normalizeAmount(log.miles_driven), 0);
   const totalHoursWorked = metrics.reduce((sum, item) => sum + item.metrics.hoursWorked, 0);
   const totalGasSpent = weekLogs.reduce((sum, log) => sum + normalizeAmount(log.gas_spent), 0);
   const totalGallonsBought = metrics.reduce((sum, item) => sum + item.metrics.gallonsBought, 0);
   const totalExtraExpenses = weekLogs.reduce((sum, log) => sum + normalizeAmount(log.extra_expenses), 0);
-  const netProfit = calculateDriverLogNetProfit(totalGrossEarnings, totalGasSpent, totalExtraExpenses);
+  const totalStopsCompleted = weekLogs.reduce((sum, log) => sum + normalizeAmount(log.stops_completed), 0);
+  const netProfit = calculateDriverLogNetProfit(totalGrossEarnings, totalGasSpent, totalExtraExpenses, totalTipsReceived);
 
   return {
     startDate: range.startDate,
     endDate: range.endDate,
     totalGrossEarnings,
+    totalTipsReceived,
+    totalEarnings,
     totalMiles,
     totalHoursWorked,
     totalGasSpent,
     averageGasPricePaid: totalGallonsBought > 0 ? totalGasSpent / totalGallonsBought : 0,
     totalGallonsBought,
     totalExtraExpenses,
+    totalStopsCompleted,
     netProfit,
-    grossPerHour: calculateEarningsPerHour(totalGrossEarnings, totalHoursWorked),
+    grossPerHour: calculateEarningsPerHour(totalEarnings, totalHoursWorked),
     netPerHour: calculateEarningsPerHour(netProfit, totalHoursWorked),
-    grossPerMile: calculateEarningsPerMile(totalGrossEarnings, totalMiles),
+    grossPerMile: calculateEarningsPerMile(totalEarnings, totalMiles),
     netPerMile: calculateEarningsPerMile(netProfit, totalMiles),
+    grossPerStop: totalStopsCompleted > 0 ? totalEarnings / totalStopsCompleted : 0,
+    netPerStop: totalStopsCompleted > 0 ? netProfit / totalStopsCompleted : 0,
     workDaysLogged: weekLogs.length
   };
 }

@@ -4,7 +4,7 @@ import {
   calculateEarningsPerMile
 } from "@/lib/financeCalculations";
 import { formatDurationFromDecimalHours, formatTime12Hour } from "@/lib/format";
-import { normalizeLanguage } from "@/lib/i18n";
+import { normalizeLanguage, workLogTypeLabel } from "@/lib/i18n";
 import type { DailyIncomeEntry, DriverLog, Language } from "@/types/app";
 
 type ExportValue = string | number;
@@ -13,62 +13,80 @@ export type ExportRow = Record<string, ExportValue>;
 const driverLogHeaders = {
   en: {
     date: "Date",
+    workType: "Work type",
     platform: "Platform",
     startTime: "Start time",
     endTime: "End time",
     hoursWorked: "Hours worked",
     milesDriven: "Miles driven",
     grossEarnings: "Gross earnings",
+    tipsReceived: "Tips received",
+    totalEarnings: "Total earnings",
     gasSpent: "Gas spent",
     gasPricePerGallon: "Gas price per gallon",
     gallonsBought: "Gallons bought",
     extraExpenses: "Extra expenses",
+    stopsCompleted: "Stops completed",
     extraExpenseNotes: "Extra expense notes",
     netProfit: "Net profit",
     grossPerHour: "Gross per hour",
     netPerHour: "Net per hour",
     grossPerMile: "Gross per mile",
     netPerMile: "Net per mile",
+    grossPerStop: "Gross per stop",
+    netPerStop: "Net per stop",
     notes: "Notes"
   },
   pt: {
     date: "Data",
+    workType: "Tipo de trabalho",
     platform: "Plataforma",
     startTime: "Hora inicial",
     endTime: "Hora final",
     hoursWorked: "Horas trabalhadas",
     milesDriven: "Milhas dirigidas",
     grossEarnings: "Ganho bruto",
+    tipsReceived: "Gorjetas recebidas",
+    totalEarnings: "Ganhos totais",
     gasSpent: "Gasolina gasta",
     gasPricePerGallon: "Preço da gasolina por galão",
     gallonsBought: "Galões comprados",
     extraExpenses: "Gastos extras",
+    stopsCompleted: "Stops feitos",
     extraExpenseNotes: "Observações dos gastos extras",
     netProfit: "Lucro líquido",
     grossPerHour: "Bruto por hora",
     netPerHour: "Líquido por hora",
     grossPerMile: "Bruto por milha",
     netPerMile: "Líquido por milha",
+    grossPerStop: "Bruto por stop",
+    netPerStop: "Líquido por stop",
     notes: "Observações"
   },
   es: {
     date: "Fecha",
+    workType: "Tipo de trabajo",
     platform: "Plataforma",
     startTime: "Hora inicial",
     endTime: "Hora final",
     hoursWorked: "Horas trabajadas",
     milesDriven: "Millas conducidas",
     grossEarnings: "Ingreso bruto",
+    tipsReceived: "Propinas recibidas",
+    totalEarnings: "Ingresos totales",
     gasSpent: "Gasolina gastada",
     gasPricePerGallon: "Precio de gasolina por galón",
     gallonsBought: "Galones comprados",
     extraExpenses: "Gastos extras",
+    stopsCompleted: "Paradas completadas",
     extraExpenseNotes: "Notas de gastos extras",
     netProfit: "Ganancia neta",
     grossPerHour: "Bruto por hora",
     netPerHour: "Neto por hora",
     grossPerMile: "Bruto por milla",
     netPerMile: "Neto por milla",
+    grossPerStop: "Bruto por parada",
+    netPerStop: "Neto por parada",
     notes: "Notas"
   }
 } as const;
@@ -385,22 +403,28 @@ export function buildDriverLogExportRows(logs: DriverLog[], language: Language |
 
     return {
       [h.date]: log.date,
+      [h.workType]: workLogTypeLabel(language, log.work_type ?? "driver"),
       [h.platform]: log.platform,
       [h.startTime]: formatTime12Hour(log.start_time),
       [h.endTime]: formatTime12Hour(log.end_time),
       [h.hoursWorked]: formatDurationFromDecimalHours(metrics.hoursWorked),
       [h.milesDriven]: fixed(log.miles_driven, 1),
       [h.grossEarnings]: fixed(log.gross_earnings),
+      [h.tipsReceived]: fixed(log.tips_received),
+      [h.totalEarnings]: fixed(metrics.totalEarnings),
       [h.gasSpent]: fixed(log.gas_spent),
       [h.gasPricePerGallon]: fixed(log.gas_price_per_gallon, 3),
       [h.gallonsBought]: fixed(metrics.gallonsBought),
       [h.extraExpenses]: fixed(log.extra_expenses),
+      [h.stopsCompleted]: fixed(log.stops_completed, 0),
       [h.extraExpenseNotes]: log.extra_expense_notes ?? "",
       [h.netProfit]: fixed(metrics.netProfit),
       [h.grossPerHour]: fixed(metrics.earningsPerHour),
       [h.netPerHour]: fixed(metrics.netProfitPerHour),
       [h.grossPerMile]: fixed(metrics.earningsPerMile),
       [h.netPerMile]: fixed(metrics.netProfitPerMile),
+      [h.grossPerStop]: fixed(metrics.grossPerStop),
+      [h.netPerStop]: fixed(metrics.netPerStop),
       [h.notes]: log.notes ?? ""
     };
   });
@@ -414,35 +438,43 @@ export function buildDriverLogExportRows(logs: DriverLog[], language: Language |
       const metrics = calculateDriverLogMetrics(log);
       return {
         gross: sum.gross + log.gross_earnings,
+        tips: sum.tips + (log.tips_received ?? 0),
         miles: sum.miles + log.miles_driven,
         hours: sum.hours + metrics.hoursWorked,
         gas: sum.gas + log.gas_spent,
         gallons: sum.gallons + metrics.gallonsBought,
         extra: sum.extra + log.extra_expenses,
+        stops: sum.stops + (log.stops_completed ?? 0),
         net: sum.net + metrics.netProfit
       };
     },
-    { gross: 0, miles: 0, hours: 0, gas: 0, gallons: 0, extra: 0, net: 0 }
+    { gross: 0, tips: 0, miles: 0, hours: 0, gas: 0, gallons: 0, extra: 0, stops: 0, net: 0 }
   );
 
   rows.push({
     [h.date]: "TOTAL",
+    [h.workType]: "",
     [h.platform]: "",
     [h.startTime]: "",
     [h.endTime]: "",
     [h.hoursWorked]: formatDurationFromDecimalHours(totals.hours),
     [h.milesDriven]: fixed(totals.miles, 1),
     [h.grossEarnings]: fixed(totals.gross),
+    [h.tipsReceived]: fixed(totals.tips),
+    [h.totalEarnings]: fixed(totals.gross + totals.tips),
     [h.gasSpent]: fixed(totals.gas),
     [h.gasPricePerGallon]: "",
     [h.gallonsBought]: fixed(totals.gallons),
     [h.extraExpenses]: fixed(totals.extra),
+    [h.stopsCompleted]: fixed(totals.stops, 0),
     [h.extraExpenseNotes]: "",
     [h.netProfit]: fixed(totals.net),
     [h.grossPerHour]: "",
     [h.netPerHour]: "",
     [h.grossPerMile]: "",
     [h.netPerMile]: "",
+    [h.grossPerStop]: "",
+    [h.netPerStop]: "",
     [h.notes]: ""
   });
 

@@ -19,6 +19,30 @@ export const workTypes = [
 
 export const platforms = workTypes;
 
+export const workLogTypes = [
+  "driver",
+  "cleaner",
+  "restaurant_worker",
+  "server_waiter",
+  "warehouse",
+  "construction",
+  "landscaping",
+  "delivery_courier",
+  "other"
+] as const;
+
+export const workLogSourceOptionsByType = {
+  driver: ["Uber", "Lyft", "DoorDash", "Uber Eats", "Amazon Flex", "Spark", "Instacart", "OnTrac", "Other"],
+  delivery_courier: ["Uber", "Lyft", "DoorDash", "Uber Eats", "Amazon Flex", "Spark", "Instacart", "OnTrac", "Other"],
+  cleaner: ["House cleaning", "Office cleaning", "Airbnb cleaning", "Hotel cleaning", "Company", "Private client", "Other"],
+  restaurant_worker: ["Restaurant", "Bar", "Cafe", "Catering", "Hotel", "Other"],
+  server_waiter: ["Restaurant", "Bar", "Cafe", "Catering", "Hotel", "Other"],
+  warehouse: ["Warehouse", "Amazon", "FedEx", "UPS", "Walmart", "Company", "Other"],
+  construction: ["Construction", "Contractor", "Day labor", "Company", "Other"],
+  landscaping: ["Landscaping", "Lawn care", "Snow removal", "Company", "Private client", "Other"],
+  other: ["Company", "Private client", "Other"]
+} as const;
+
 export const incomeEntryTypes = [
   { value: "actual", label: "Actual income already received" },
   { value: "confirmed", label: "Confirmed upcoming payment" },

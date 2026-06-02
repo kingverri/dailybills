@@ -9,6 +9,7 @@ import type {
   paymentScheduleTypes,
   platforms,
   weeklySettlementDays,
+  workLogTypes,
   workTypes
 } from "@/lib/constants";
 
@@ -24,6 +25,7 @@ export type BillRepeatUntilType = "never" | "specific_month";
 export type FuelType = (typeof fuelTypes)[number];
 export type IncomeEntryType = (typeof incomeEntryTypes)[number]["value"];
 export type WeeklySettlementDay = (typeof weeklySettlementDays)[number];
+export type WorkLogType = (typeof workLogTypes)[number];
 export type Language = "en" | "pt" | "es";
 export type AppTheme = "dark" | "soft_light" | "light";
 export type UserPlan = "free" | "pro_monthly" | "pro_yearly";
@@ -128,14 +130,17 @@ export type DriverLog = {
   id: string;
   user_id: string;
   date: string;
-  platform: Platform;
+  work_type: WorkLogType;
+  platform: string;
   start_time: string | null;
   end_time: string | null;
   miles_driven: number;
   gross_earnings: number;
+  tips_received: number;
   gas_spent: number;
   gas_price_per_gallon: number;
   extra_expenses: number;
+  stops_completed: number;
   extra_expense_notes: string | null;
   notes: string | null;
   created_at: string;

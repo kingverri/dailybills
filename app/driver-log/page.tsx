@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { TimePicker12Hour } from "@/components/TimePicker12Hour";
-import { platforms, weeklySettlementDays } from "@/lib/constants";
+import { weeklySettlementDays, workLogSourceOptionsByType, workLogTypes } from "@/lib/constants";
 import {
   calculateDriverLogMetrics,
   calculateWeeklyDriverSummaryForRange,
@@ -24,7 +24,7 @@ import {
   formatTime12Hour,
   toDateInputValue
 } from "@/lib/format";
-import { settlementDayLabel, t } from "@/lib/i18n";
+import { settlementDayLabel, t, workLogTypeLabel } from "@/lib/i18n";
 import {
   canAddDriverLog,
   canUseWeeklyHistory,
@@ -34,18 +34,21 @@ import {
 } from "@/lib/planLimits";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
-import type { DriverLog, PaySchedule, Platform, WeeklySettlementDay } from "@/types/app";
+import type { DriverLog, PaySchedule, WeeklySettlementDay, WorkLogType } from "@/types/app";
 
 type DriverLogForm = {
   date: string;
-  platform: Platform;
+  work_type: WorkLogType;
+  platform: string;
   start_time: string;
   end_time: string;
   miles_driven: string;
   gross_earnings: string;
+  tips_received: string;
   gas_spent: string;
   gas_price_per_gallon: string;
   extra_expenses: string;
+  stops_completed: string;
   extra_expense_notes: string;
   notes: string;
 };
@@ -54,14 +57,17 @@ type ExportFormat = "csv" | "xlsx" | "google";
 
 const initialForm: DriverLogForm = {
   date: toDateInputValue(),
+  work_type: "driver",
   platform: "DoorDash",
   start_time: "",
   end_time: "",
   miles_driven: "",
   gross_earnings: "",
+  tips_received: "",
   gas_spent: "",
   gas_price_per_gallon: "",
   extra_expenses: "",
+  stops_completed: "",
   extra_expense_notes: "",
   notes: ""
 };
@@ -103,10 +109,18 @@ export default function DriverLogPage() {
   const canChangeSettlementDay = canUseWeeklySettlement(currentPlan);
   const canViewWeeklyHistory = canUseWeeklyHistory(currentPlan);
   const gross = Number(form.gross_earnings || 0);
+  const tipsReceived = Number(form.tips_received || 0);
   const miles = Number(form.miles_driven || 0);
   const gasSpent = Number(form.gas_spent || 0);
   const gasPrice = Number(form.gas_price_per_gallon || 0);
   const extraExpenses = Number(form.extra_expenses || 0);
+  const stopsCompleted = Number(form.stops_completed || 0);
+  const jobSourceOptions = useMemo(() => {
+    const options: string[] = [...workLogSourceOptionsByType[form.work_type]];
+    return form.platform && !options.includes(form.platform) ? [...options, form.platform] : options;
+  }, [form.platform, form.work_type]);
+  const showStopsField =
+    (form.work_type === "driver" || form.work_type === "delivery_courier") && form.platform === "OnTrac";
   const preview = useMemo(
     () =>
       calculateDriverLogMetrics({
@@ -114,11 +128,13 @@ export default function DriverLogPage() {
         end_time: form.end_time || null,
         miles_driven: miles,
         gross_earnings: gross,
+        tips_received: tipsReceived,
         gas_spent: gasSpent,
         gas_price_per_gallon: gasPrice,
-        extra_expenses: extraExpenses
+        extra_expenses: extraExpenses,
+        stops_completed: stopsCompleted
       }),
-    [extraExpenses, form.end_time, form.start_time, gasPrice, gasSpent, gross, miles]
+    [extraExpenses, form.end_time, form.start_time, gasPrice, gasSpent, gross, miles, stopsCompleted, tipsReceived]
   );
   const currentWeekRange = useMemo(() => getWeekRangeBySettlementDay(new Date(), settlementDay), [settlementDay]);
   const previousWeekRange = useMemo(() => {
@@ -190,14 +206,17 @@ export default function DriverLogPage() {
     setShowForm(true);
     setForm({
       date: log.date,
+      work_type: log.work_type ?? "driver",
       platform: log.platform,
       start_time: timeForInput(log.start_time),
       end_time: timeForInput(log.end_time),
       miles_driven: String(log.miles_driven),
       gross_earnings: String(log.gross_earnings),
+      tips_received: log.tips_received ? String(log.tips_received) : "",
       gas_spent: String(log.gas_spent),
       gas_price_per_gallon: String(log.gas_price_per_gallon),
       extra_expenses: String(log.extra_expenses),
+      stops_completed: log.stops_completed ? String(log.stops_completed) : "",
       extra_expense_notes: log.extra_expense_notes ?? "",
       notes: log.notes ?? ""
     });
@@ -254,13 +273,16 @@ export default function DriverLogPage() {
       miles < 0 ||
       !Number.isFinite(gross) ||
       gross < 0 ||
+      !Number.isFinite(tipsReceived) ||
+      tipsReceived < 0 ||
       !Number.isFinite(gasSpent) ||
       gasSpent < 0 ||
       !Number.isFinite(gasPrice) ||
       gasPrice < 0 ||
       !Number.isFinite(extraExpenses) ||
       extraExpenses < 0 ||
-      (gasSpent > 0 && gasPrice <= 0)
+      !Number.isFinite(stopsCompleted) ||
+      stopsCompleted < 0
     ) {
       setError(t(language, "logRequiredError"));
       return;
@@ -270,14 +292,17 @@ export default function DriverLogPage() {
     const supabase = getSupabaseClient();
     const payload = {
       date: form.date,
+      work_type: form.work_type,
       platform: form.platform,
       start_time: form.start_time || null,
       end_time: form.end_time || null,
       miles_driven: miles,
       gross_earnings: gross,
+      tips_received: tipsReceived,
       gas_spent: gasSpent,
       gas_price_per_gallon: gasPrice,
       extra_expenses: extraExpenses,
+      stops_completed: showStopsField ? stopsCompleted : 0,
       extra_expense_notes: form.extra_expense_notes.trim() || null,
       notes: form.notes.trim() || null
     };
@@ -481,14 +506,49 @@ export default function DriverLogPage() {
                   <input className="field" type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
                 </label>
                 <label className="block space-y-2">
-                  <span className="field-label">{t(language, "platform")}</span>
-                  <select className="field" value={form.platform} onChange={(event) => setForm({ ...form, platform: event.target.value as Platform })}>
-                    {platforms.map((platform) => (
-                      <option key={platform}>{platform}</option>
+                  <span className="field-label">{t(language, "workType")}</span>
+                  <select
+                    className="field"
+                    value={form.work_type}
+                    onChange={(event) => {
+                      const nextWorkType = event.target.value as WorkLogType;
+                      setForm({
+                        ...form,
+                        work_type: nextWorkType,
+                        platform: workLogSourceOptionsByType[nextWorkType][0],
+                        stops_completed: ""
+                      });
+                    }}
+                  >
+                    {workLogTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {workLogTypeLabel(language, type)}
+                      </option>
                     ))}
                   </select>
                 </label>
               </div>
+
+              <label className="block space-y-2">
+                <span className="field-label">{t(language, "jobPlatform")}</span>
+                <select
+                  className="field"
+                  value={form.platform}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      platform: event.target.value,
+                      stops_completed: event.target.value === "OnTrac" ? form.stops_completed : ""
+                    })
+                  }
+                >
+                  {jobSourceOptions.map((source) => (
+                    <option key={source} value={source}>
+                      {source}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <TimePicker12Hour
@@ -512,6 +572,10 @@ export default function DriverLogPage() {
                   <span className="field-label">{t(language, "grossEarnings")}</span>
                   <input className="field" inputMode="decimal" value={form.gross_earnings} onChange={(event) => setForm({ ...form, gross_earnings: event.target.value })} />
                 </label>
+                <label className="block space-y-2">
+                  <span className="field-label">{t(language, "tipsReceived")}</span>
+                  <input className="field" inputMode="decimal" value={form.tips_received} onChange={(event) => setForm({ ...form, tips_received: event.target.value })} />
+                </label>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -530,13 +594,28 @@ export default function DriverLogPage() {
                 <input className="field" inputMode="decimal" value={form.extra_expenses} onChange={(event) => setForm({ ...form, extra_expenses: event.target.value })} />
               </label>
 
+              {showStopsField ? (
+                <label className="block space-y-2">
+                  <span className="field-label">{t(language, "stopsCompleted")}</span>
+                  <input className="field" inputMode="numeric" value={form.stops_completed} onChange={(event) => setForm({ ...form, stops_completed: event.target.value })} />
+                </label>
+              ) : null}
+
               <div className="rounded-lg border border-line bg-neutral-50 p-3">
                 <p className="text-sm font-semibold text-ink">{t(language, "tripMath")}</p>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                   <Metric label={t(language, "hoursWorkedCalculated")} value={formatDurationFromDecimalHours(preview.hoursWorked)} />
-                  <Metric label={t(language, "gallonsBought")} value={preview.gallonsBought.toFixed(2)} />
+                  <Metric label={t(language, "totalEarnings")} value={formatCurrency(preview.totalEarnings, currency)} />
                   <Metric label={t(language, "netProfit")} value={formatCurrency(preview.netProfit, currency)} />
                   <Metric label={t(language, "netPerHour")} value={formatHourlyRate(preview.netProfitPerHour, currency, language)} />
+                  {showStopsField && stopsCompleted > 0 ? (
+                    <>
+                      <Metric label={t(language, "grossPerStop")} value={formatCurrency(preview.grossPerStop, currency)} />
+                      <Metric label={t(language, "netPerStop")} value={formatCurrency(preview.netPerStop, currency)} />
+                    </>
+                  ) : (
+                    <Metric label={t(language, "gallonsBought")} value={preview.gallonsBought.toFixed(2)} />
+                  )}
                 </div>
               </div>
 
@@ -621,9 +700,9 @@ function WeeklySummaryCard({
       </div>
       <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-6">
         <Metric label={t(language, "totalGrossEarnings")} value={formatCurrency(summary.totalGrossEarnings, currency)} />
-        <Metric label={t(language, "totalMiles")} value={summary.totalMiles.toFixed(1)} />
+        <Metric label={t(language, "totalTips")} value={formatCurrency(summary.totalTipsReceived, currency)} />
+        <Metric label={t(language, "totalEarnings")} value={formatCurrency(summary.totalEarnings, currency)} />
         <Metric label={t(language, "totalHoursWorked")} value={formatDurationFromDecimalHours(summary.totalHoursWorked)} />
-        <Metric label={t(language, "totalGasSpent")} value={formatCurrency(summary.totalGasSpent, currency)} />
         <Metric label={t(language, "netProfit")} value={formatCurrency(summary.netProfit, currency)} />
         <Metric label={t(language, "workDaysLogged")} value={String(summary.workDaysLogged)} />
       </div>
@@ -634,6 +713,8 @@ function WeeklySummaryCard({
         </button>
         {showFull ? (
           <div className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+            <Metric label={t(language, "totalMiles")} value={summary.totalMiles.toFixed(1)} />
+            <Metric label={t(language, "totalGasSpent")} value={formatCurrency(summary.totalGasSpent, currency)} />
             <Metric label={t(language, "averageGasPrice")} value={formatCurrency(summary.averageGasPricePaid, currency)} />
             <Metric label={t(language, "gallonsBought")} value={summary.totalGallonsBought.toFixed(2)} />
             <Metric label={t(language, "grossPerHour")} value={formatHourlyRate(summary.grossPerHour, currency, language)} />
@@ -641,6 +722,13 @@ function WeeklySummaryCard({
             <Metric label={t(language, "grossPerMile")} value={formatCurrency(summary.grossPerMile, currency)} />
             <Metric label={t(language, "netPerMile")} value={formatCurrency(summary.netPerMile, currency)} />
             <Metric label={t(language, "extraExpenses")} value={formatCurrency(summary.totalExtraExpenses, currency)} />
+            {summary.totalStopsCompleted > 0 ? (
+              <>
+                <Metric label={t(language, "totalStops")} value={summary.totalStopsCompleted.toFixed(0)} />
+                <Metric label={t(language, "grossPerStop")} value={formatCurrency(summary.grossPerStop, currency)} />
+                <Metric label={t(language, "netPerStop")} value={formatCurrency(summary.netPerStop, currency)} />
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -684,7 +772,10 @@ function WeekDetailsCard({
                   <div>
                     <p className="font-semibold text-ink">{formatDate(log.date, language)}</p>
                     <p className="text-sm text-neutral-600">
-                      {log.platform} - {formatTime12Hour(log.start_time)} - {formatTime12Hour(log.end_time)}
+                      {workLogTypeLabel(language, log.work_type ?? "driver")} - {log.platform}
+                    </p>
+                    <p className="text-sm text-neutral-600">
+                      {formatTime12Hour(log.start_time)} - {formatTime12Hour(log.end_time)}
                     </p>
                   </div>
                   <p className="font-bold text-ink">{formatCurrency(metrics.netProfit, currency)}</p>
@@ -693,8 +784,17 @@ function WeekDetailsCard({
                   <Metric label={t(language, "miles")} value={log.miles_driven.toFixed(1)} />
                   <Metric label={t(language, "hoursWorkedCalculated")} value={formatDurationFromDecimalHours(metrics.hoursWorked)} />
                   <Metric label={t(language, "gross")} value={formatCurrency(log.gross_earnings, currency)} />
+                  <Metric label={t(language, "tipsReceived")} value={formatCurrency(log.tips_received ?? 0, currency)} />
+                  <Metric label={t(language, "totalEarnings")} value={formatCurrency(metrics.totalEarnings, currency)} />
                   <Metric label={t(language, "gasSpent")} value={formatCurrency(log.gas_spent, currency)} />
                   <Metric label={t(language, "extraExpenses")} value={formatCurrency(log.extra_expenses, currency)} />
+                  {(log.stops_completed ?? 0) > 0 ? (
+                    <>
+                      <Metric label={t(language, "stopsCompleted")} value={String(log.stops_completed)} />
+                      <Metric label={t(language, "grossPerStop")} value={formatCurrency(metrics.grossPerStop, currency)} />
+                      <Metric label={t(language, "netPerStop")} value={formatCurrency(metrics.netPerStop, currency)} />
+                    </>
+                  ) : null}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button className="btn-secondary" type="button" onClick={() => onEdit(log)}>
