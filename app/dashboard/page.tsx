@@ -3,13 +3,22 @@
 import clsx from "clsx";
 import {
   ArrowRight,
+  Activity,
+  BarChart3,
   CalendarDays,
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  CheckCircle2,
   LockKeyhole,
-  Plus
+  PiggyBank,
+  Plus,
+  Receipt,
+  ShieldAlert,
+  Target,
+  Wallet
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -242,20 +251,26 @@ export default function DashboardPage() {
               label={t(language, "safeToSpendToday")}
               value={formatCurrency(dashboard.cashFlow.safeToSpendToday, currency)}
               helper={t(language, "basedOnProjectionPeriod")}
+              icon={Wallet}
               tone="good"
             />
             <StatCard
               label={t(language, "needToEarnToday")}
               value={formatCurrency(dashboard.cashFlow.needToEarnToday, currency)}
               helper={t(language, "basedOnProjectionPeriod")}
+              icon={Target}
               tone={dashboard.cashFlow.needToEarnToday > 0 ? "warn" : "neutral"}
             />
-            <StatCard label={t(language, "riskLevel")} value={riskCopy.label} helper={riskCopy.helper} tone={riskCopy.tone} />
+            <StatCard label={t(language, "riskLevel")} value={riskCopy.label} helper={riskCopy.helper} icon={ShieldAlert} tone={riskCopy.tone} />
           </div>
 
           <section className="card p-4">
             <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-              <div>
+              <div className="flex items-start gap-3">
+                <span className="icon-chip">
+                  <Activity size={21} aria-hidden="true" />
+                </span>
+                <div>
                 <h2 className="text-lg font-semibold text-ink">{t(language, "cashFlowProjection")}</h2>
                 <p className="text-sm text-neutral-600">
                   {t(language, "projectionPeriod")}: {projectionPeriodLabel(language, dashboard.cashFlow.period)}
@@ -263,17 +278,20 @@ export default function DashboardPage() {
                 <p className="text-sm text-neutral-600">
                   {formatDate(dashboard.cashFlow.startDate, language)} - {formatDate(dashboard.cashFlow.endDate, language)}
                 </p>
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <SummaryItem label={t(language, "projectedCash")} value={formatCurrency(dashboard.cashFlow.projectedCash, currency)} />
-              <SummaryItem label={t(language, "upcomingBills")} value={formatCurrency(dashboard.includedBillsTotal, currency)} />
+              <SummaryItem icon={PiggyBank} label={t(language, "projectedCash")} value={formatCurrency(dashboard.cashFlow.projectedCash, currency)} tone="good" />
+              <SummaryItem icon={Receipt} label={t(language, "upcomingBills")} value={formatCurrency(dashboard.includedBillsTotal, currency)} />
               <SummaryItem
+                icon={CheckCircle2}
                 label={t(language, "afterBills")}
                 value={formatCurrency(dashboard.cashFlow.projectedBalanceAfterBills, currency)}
+                tone={dashboard.cashFlow.projectedBalanceAfterBills < 0 ? "danger" : dashboard.cashFlow.projectedBalanceAfterBills <= 100 ? "warn" : "good"}
               />
               {dashboard.cashFlow.shortfall > 0 ? (
-                <SummaryItem label={t(language, "shortfall")} value={formatCurrency(dashboard.cashFlow.shortfall, currency)} />
+                <SummaryItem icon={ShieldAlert} label={t(language, "shortfall")} value={formatCurrency(dashboard.cashFlow.shortfall, currency)} tone="danger" />
               ) : null}
             </div>
             <div className="mt-4 border-t border-line pt-3">
@@ -350,7 +368,9 @@ export default function DashboardPage() {
           <section className="card p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-brand-700">
-                <CalendarDays size={20} aria-hidden="true" />
+                <span className="icon-chip-sm">
+                  <CalendarDays size={18} aria-hidden="true" />
+                </span>
                 <h2 className="text-lg font-semibold text-ink">{t(language, "upcomingBills")}</h2>
               </div>
               <Link className="text-sm font-semibold text-brand-700" href="/bills">
@@ -360,7 +380,11 @@ export default function DashboardPage() {
             {dashboard.nextBill ? (
               <div className="space-y-4">
                 <div className="flex flex-col gap-2 rounded-lg border border-line bg-neutral-50 p-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
+                  <div className="flex items-start gap-3">
+                    <span className="icon-chip-sm text-fuel-700">
+                      <Receipt size={17} aria-hidden="true" />
+                    </span>
+                    <div>
                     <p className="font-semibold text-ink">{dashboard.nextBill.name}</p>
                     <p className="text-sm text-neutral-600">
                       {t(language, "due")} {formatDate(dashboard.nextBill.occurrenceDate, language)}{" - "}
@@ -368,6 +392,11 @@ export default function DashboardPage() {
                         ? t(language, "daysLeft", { count: dashboard.nextBill.daysRemaining })
                         : t(language, "daysLeftPlural", { count: dashboard.nextBill.daysRemaining })}
                     </p>
+                    <span className={clsx("badge mt-2", dashboard.nextBill.daysRemaining < 0 ? "badge-danger" : dashboard.nextBill.daysRemaining <= 7 ? "badge-warn" : "badge-muted")}>
+                      <CalendarDays size={13} aria-hidden="true" />
+                      {dashboard.nextBill.daysRemaining < 0 ? t(language, "overdue") : dashboard.nextBill.daysRemaining <= 7 ? t(language, "dueSoon") : t(language, "unpaid")}
+                    </span>
+                    </div>
                   </div>
                   <p className="text-xl font-bold text-ink">{formatCurrency(dashboard.nextBill.amount, currency)}</p>
                 </div>
@@ -405,16 +434,21 @@ export default function DashboardPage() {
 
           <section className="card p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
+              <div className="flex items-start gap-3">
+                <span className="icon-chip">
+                  <BarChart3 size={21} aria-hidden="true" />
+                </span>
+                <div>
                 <h2 className="text-lg font-semibold text-ink">{t(language, "currentMonthSummary")}</h2>
                 <p className="text-sm text-neutral-600">{t(language, "currentMonthSummaryHelper")}</p>
+                </div>
               </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              <SummaryItem label={t(language, "totalIncome")} value={formatCurrency(dashboard.summary.totalIncome, currency)} />
-              <SummaryItem label={t(language, "netProfit")} value={formatCurrency(dashboard.summary.netProfit, currency)} />
-              <SummaryItem label={t(language, "unpaidBills")} value={formatCurrency(dashboard.summary.totalUnpaidBills, currency)} />
+              <SummaryItem icon={PiggyBank} label={t(language, "totalIncome")} value={formatCurrency(dashboard.summary.totalIncome, currency)} tone="good" />
+              <SummaryItem icon={Activity} label={t(language, "netProfit")} value={formatCurrency(dashboard.summary.netProfit, currency)} />
+              <SummaryItem icon={Receipt} label={t(language, "unpaidBills")} value={formatCurrency(dashboard.summary.totalUnpaidBills, currency)} tone={dashboard.summary.totalUnpaidBills > 0 ? "warn" : "good"} />
             </div>
             <div className="mt-4 border-t border-line pt-3">
               <button
@@ -427,14 +461,15 @@ export default function DashboardPage() {
               </button>
               {showFullMonthlySummary ? (
                 <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-5">
-                  <SummaryItem label={t(language, "billsPaid")} value={formatCurrency(dashboard.summary.totalBillsPaid, currency)} />
+                  <SummaryItem icon={CheckCircle2} label={t(language, "billsPaid")} value={formatCurrency(dashboard.summary.totalBillsPaid, currency)} />
                   <SummaryItem
+                    icon={Wallet}
                     label={t(language, "estimatedBalance")}
                     value={formatCurrency(dashboard.summary.estimatedRemainingBalance, currency)}
                   />
                   <SummaryItem label={t(language, "totalMiles")} value={`${dashboard.summary.totalMiles.toFixed(1)} mi`} />
                   <SummaryItem label={t(language, "totalGasCost")} value={formatCurrency(dashboard.summary.totalGasCost, currency)} />
-                  <SummaryItem label={t(language, "expectedIncome")} value={formatCurrency(dashboard.summary.expectedIncome, currency)} />
+                  <SummaryItem icon={PiggyBank} label={t(language, "expectedIncome")} value={formatCurrency(dashboard.summary.expectedIncome, currency)} />
                 </div>
               ) : null}
             </div>
@@ -442,7 +477,7 @@ export default function DashboardPage() {
 
           <Link className="card flex items-center justify-between gap-4 p-4 transition hover:border-brand-200 hover:bg-brand-50" href="/driver-log">
             <div className="flex items-center gap-3">
-              <span className="rounded-md bg-brand-50 p-2.5 text-brand-700">
+              <span className="icon-chip">
                 <ClipboardList size={22} aria-hidden="true" />
               </span>
               <div>
@@ -478,10 +513,24 @@ export default function DashboardPage() {
   );
 }
 
-function SummaryItem({ label, value }: { label: string; value: string }) {
+function SummaryItem({ label, value, icon: Icon, tone = "neutral" }: { label: string; value: string; icon?: LucideIcon; tone?: "neutral" | "good" | "warn" | "danger" }) {
   return (
-    <div className="rounded-lg border border-line bg-neutral-50 p-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</p>
+    <div
+      className={clsx(
+        "metric-card",
+        tone === "good" && "border-brand-200",
+        tone === "warn" && "border-amber-200",
+        tone === "danger" && "border-red-200"
+      )}
+    >
+      <div className="flex items-center gap-2">
+        {Icon ? (
+          <span className={clsx("icon-chip-sm", tone === "warn" && "text-amber-700", tone === "danger" && "text-red-700")}>
+            <Icon size={16} aria-hidden="true" />
+          </span>
+        ) : null}
+        <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</p>
+      </div>
       <p className="mt-1 text-lg font-bold text-ink">{value}</p>
     </div>
   );

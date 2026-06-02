@@ -198,7 +198,64 @@ textarea {
 @layer components {
   .card {
     background: var(--card-bg);
-    @apply rounded-lg border border-line shadow-card backdrop-blur;
+    @apply rounded-2xl border border-line shadow-card backdrop-blur;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 34%),
+      radial-gradient(circle at 16% 0%, rgba(34, 197, 94, 0.08), transparent 18rem);
+    opacity: 0.72;
+  }
+
+  .card > * {
+    position: relative;
+  }
+
+  .metric-card {
+    @apply rounded-2xl border border-line bg-neutral-50 p-3 shadow-sm transition;
+  }
+
+  .icon-chip {
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-line bg-neutral-50 text-brand-700 shadow-sm;
+  }
+
+  .icon-chip-sm {
+    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-line bg-neutral-50 text-brand-700;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full border border-line bg-neutral-50 px-2.5 py-1 text-xs font-bold text-neutral-700;
+  }
+
+  .badge-good {
+    @apply border-brand-200 bg-brand-50 text-brand-800;
+  }
+
+  .badge-warn {
+    @apply border-amber-200 bg-amber-50 text-amber-800;
+  }
+
+  .badge-danger {
+    @apply border-red-200 bg-red-50 text-red-700;
+  }
+
+  .badge-blue {
+    @apply border-sky-200 bg-sky-50 text-sky-700;
+  }
+
+  .badge-purple {
+    @apply border-violet-200 bg-violet-50 text-violet-700;
+  }
+
+  .badge-muted {
+    @apply border-line bg-neutral-50 text-neutral-600;
   }
 
   .field-label {

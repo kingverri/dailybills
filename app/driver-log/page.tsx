@@ -1,6 +1,29 @@
 "use client";
 
-import { CalendarDays, ChevronDown, ChevronUp, ClipboardList, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  CalendarDays,
+  Car,
+  ChevronDown,
+  ChevronUp,
+  Clock3,
+  ClipboardList,
+  DollarSign,
+  Hammer,
+  HandCoins,
+  Leaf,
+  MapPin,
+  Package,
+  Pencil,
+  Plus,
+  Receipt,
+  Route,
+  Sparkles,
+  Trash2,
+  Truck,
+  Utensils
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
@@ -79,6 +102,22 @@ function dayOfWeekToSettlementDay(day?: string | null): WeeklySettlementDay | nu
 
 function timeForInput(time?: string | null) {
   return time ? time.slice(0, 5) : "";
+}
+
+function workLogTypeIcon(type: WorkLogType | string | null | undefined) {
+  const icons = {
+    driver: Car,
+    cleaner: Sparkles,
+    restaurant_worker: Utensils,
+    server_waiter: HandCoins,
+    warehouse: Package,
+    construction: Hammer,
+    landscaping: Leaf,
+    delivery_courier: Truck,
+    other: BriefcaseBusiness
+  };
+
+  return icons[String(type ?? "other") as keyof typeof icons] ?? BriefcaseBusiness;
 }
 
 export default function DriverLogPage() {
@@ -699,12 +738,12 @@ function WeeklySummaryCard({
         </button>
       </div>
       <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-6">
-        <Metric label={t(language, "totalGrossEarnings")} value={formatCurrency(summary.totalGrossEarnings, currency)} />
-        <Metric label={t(language, "totalTips")} value={formatCurrency(summary.totalTipsReceived, currency)} />
-        <Metric label={t(language, "totalEarnings")} value={formatCurrency(summary.totalEarnings, currency)} />
-        <Metric label={t(language, "totalHoursWorked")} value={formatDurationFromDecimalHours(summary.totalHoursWorked)} />
-        <Metric label={t(language, "netProfit")} value={formatCurrency(summary.netProfit, currency)} />
-        <Metric label={t(language, "workDaysLogged")} value={String(summary.workDaysLogged)} />
+        <Metric icon={DollarSign} label={t(language, "totalGrossEarnings")} value={formatCurrency(summary.totalGrossEarnings, currency)} />
+        <Metric icon={HandCoins} label={t(language, "totalTips")} value={formatCurrency(summary.totalTipsReceived, currency)} />
+        <Metric icon={DollarSign} label={t(language, "totalEarnings")} value={formatCurrency(summary.totalEarnings, currency)} />
+        <Metric icon={Clock3} label={t(language, "totalHoursWorked")} value={formatDurationFromDecimalHours(summary.totalHoursWorked)} />
+        <Metric icon={Receipt} label={t(language, "netProfit")} value={formatCurrency(summary.netProfit, currency)} />
+        <Metric icon={ClipboardList} label={t(language, "workDaysLogged")} value={String(summary.workDaysLogged)} />
       </div>
       <div className="mt-4 border-t border-line pt-3">
         <button className="flex w-full items-center justify-between gap-3 text-left text-sm font-semibold text-brand-700" type="button" onClick={onToggleFull}>
@@ -713,20 +752,20 @@ function WeeklySummaryCard({
         </button>
         {showFull ? (
           <div className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
-            <Metric label={t(language, "totalMiles")} value={summary.totalMiles.toFixed(1)} />
-            <Metric label={t(language, "totalGasSpent")} value={formatCurrency(summary.totalGasSpent, currency)} />
-            <Metric label={t(language, "averageGasPrice")} value={formatCurrency(summary.averageGasPricePaid, currency)} />
-            <Metric label={t(language, "gallonsBought")} value={summary.totalGallonsBought.toFixed(2)} />
-            <Metric label={t(language, "grossPerHour")} value={formatHourlyRate(summary.grossPerHour, currency, language)} />
-            <Metric label={t(language, "netPerHour")} value={formatHourlyRate(summary.netPerHour, currency, language)} />
-            <Metric label={t(language, "grossPerMile")} value={formatCurrency(summary.grossPerMile, currency)} />
-            <Metric label={t(language, "netPerMile")} value={formatCurrency(summary.netPerMile, currency)} />
-            <Metric label={t(language, "extraExpenses")} value={formatCurrency(summary.totalExtraExpenses, currency)} />
+            <Metric icon={Route} label={t(language, "totalMiles")} value={summary.totalMiles.toFixed(1)} />
+            <Metric icon={Receipt} label={t(language, "totalGasSpent")} value={formatCurrency(summary.totalGasSpent, currency)} />
+            <Metric icon={DollarSign} label={t(language, "averageGasPrice")} value={formatCurrency(summary.averageGasPricePaid, currency)} />
+            <Metric icon={Route} label={t(language, "gallonsBought")} value={summary.totalGallonsBought.toFixed(2)} />
+            <Metric icon={Clock3} label={t(language, "grossPerHour")} value={formatHourlyRate(summary.grossPerHour, currency, language)} />
+            <Metric icon={Clock3} label={t(language, "netPerHour")} value={formatHourlyRate(summary.netPerHour, currency, language)} />
+            <Metric icon={Route} label={t(language, "grossPerMile")} value={formatCurrency(summary.grossPerMile, currency)} />
+            <Metric icon={Route} label={t(language, "netPerMile")} value={formatCurrency(summary.netPerMile, currency)} />
+            <Metric icon={Receipt} label={t(language, "extraExpenses")} value={formatCurrency(summary.totalExtraExpenses, currency)} />
             {summary.totalStopsCompleted > 0 ? (
               <>
-                <Metric label={t(language, "totalStops")} value={summary.totalStopsCompleted.toFixed(0)} />
-                <Metric label={t(language, "grossPerStop")} value={formatCurrency(summary.grossPerStop, currency)} />
-                <Metric label={t(language, "netPerStop")} value={formatCurrency(summary.netPerStop, currency)} />
+                <Metric icon={MapPin} label={t(language, "totalStops")} value={summary.totalStopsCompleted.toFixed(0)} />
+                <Metric icon={MapPin} label={t(language, "grossPerStop")} value={formatCurrency(summary.grossPerStop, currency)} />
+                <Metric icon={MapPin} label={t(language, "netPerStop")} value={formatCurrency(summary.netPerStop, currency)} />
               </>
             ) : null}
           </div>
@@ -765,11 +804,16 @@ function WeekDetailsCard({
         <div className="space-y-3">
           {logs.map((log) => {
             const metrics = calculateDriverLogMetrics(log);
+            const WorkIcon = workLogTypeIcon(log.work_type);
 
             return (
               <article key={log.id} className="rounded-lg border border-line bg-neutral-50 p-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
+                  <div className="flex items-start gap-3">
+                    <span className="icon-chip-sm">
+                      <WorkIcon size={17} aria-hidden="true" />
+                    </span>
+                    <div>
                     <p className="font-semibold text-ink">{formatDate(log.date, language)}</p>
                     <p className="text-sm text-neutral-600">
                       {workLogTypeLabel(language, log.work_type ?? "driver")} - {log.platform}
@@ -777,22 +821,23 @@ function WeekDetailsCard({
                     <p className="text-sm text-neutral-600">
                       {formatTime12Hour(log.start_time)} - {formatTime12Hour(log.end_time)}
                     </p>
+                    </div>
                   </div>
                   <p className="font-bold text-ink">{formatCurrency(metrics.netProfit, currency)}</p>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
-                  <Metric label={t(language, "miles")} value={log.miles_driven.toFixed(1)} />
-                  <Metric label={t(language, "hoursWorkedCalculated")} value={formatDurationFromDecimalHours(metrics.hoursWorked)} />
-                  <Metric label={t(language, "gross")} value={formatCurrency(log.gross_earnings, currency)} />
-                  <Metric label={t(language, "tipsReceived")} value={formatCurrency(log.tips_received ?? 0, currency)} />
-                  <Metric label={t(language, "totalEarnings")} value={formatCurrency(metrics.totalEarnings, currency)} />
-                  <Metric label={t(language, "gasSpent")} value={formatCurrency(log.gas_spent, currency)} />
-                  <Metric label={t(language, "extraExpenses")} value={formatCurrency(log.extra_expenses, currency)} />
+                  <Metric icon={Route} label={t(language, "miles")} value={log.miles_driven.toFixed(1)} />
+                  <Metric icon={Clock3} label={t(language, "hoursWorkedCalculated")} value={formatDurationFromDecimalHours(metrics.hoursWorked)} />
+                  <Metric icon={DollarSign} label={t(language, "gross")} value={formatCurrency(log.gross_earnings, currency)} />
+                  <Metric icon={HandCoins} label={t(language, "tipsReceived")} value={formatCurrency(log.tips_received ?? 0, currency)} />
+                  <Metric icon={DollarSign} label={t(language, "totalEarnings")} value={formatCurrency(metrics.totalEarnings, currency)} />
+                  <Metric icon={Receipt} label={t(language, "gasSpent")} value={formatCurrency(log.gas_spent, currency)} />
+                  <Metric icon={Receipt} label={t(language, "extraExpenses")} value={formatCurrency(log.extra_expenses, currency)} />
                   {(log.stops_completed ?? 0) > 0 ? (
                     <>
-                      <Metric label={t(language, "stopsCompleted")} value={String(log.stops_completed)} />
-                      <Metric label={t(language, "grossPerStop")} value={formatCurrency(metrics.grossPerStop, currency)} />
-                      <Metric label={t(language, "netPerStop")} value={formatCurrency(metrics.netPerStop, currency)} />
+                      <Metric icon={MapPin} label={t(language, "stopsCompleted")} value={String(log.stops_completed)} />
+                      <Metric icon={MapPin} label={t(language, "grossPerStop")} value={formatCurrency(metrics.grossPerStop, currency)} />
+                      <Metric icon={MapPin} label={t(language, "netPerStop")} value={formatCurrency(metrics.netPerStop, currency)} />
                     </>
                   ) : null}
                 </div>
@@ -815,10 +860,21 @@ function WeekDetailsCard({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  label,
+  value,
+  icon: Icon
+}: {
+  label: string;
+  value: string;
+  icon?: LucideIcon;
+}) {
   return (
-    <p>
-      <span className="block text-neutral-500">{label}</span>
+    <p className="metric-card p-2">
+      <span className="flex items-center gap-1 text-neutral-500">
+        {Icon ? <Icon size={13} aria-hidden="true" /> : null}
+        {label}
+      </span>
       <span className="font-semibold text-ink">{value}</span>
     </p>
   );

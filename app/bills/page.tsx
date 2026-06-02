@@ -7,9 +7,18 @@ import {
   ChevronRight,
   ChevronUp,
   CircleDollarSign,
+  Clock3,
+  CreditCard,
+  Car,
+  Home,
+  Landmark,
   Pencil,
   Plus,
-  Trash2
+  Receipt,
+  Shield,
+  Smartphone,
+  Trash2,
+  Zap
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -119,6 +128,60 @@ function formatSelectedMonth(monthValue: string, language: string) {
   }).format(new Date(year, month - 1, 1));
 }
 
+function billCategoryIcon(category: BillCategory) {
+  const icons = {
+    Rent: Home,
+    "Car payment": Car,
+    "Car insurance": Shield,
+    Phone: Smartphone,
+    "Credit card": CreditCard,
+    Loan: Landmark,
+    Gas: Car,
+    Food: Receipt,
+    Utilities: Zap,
+    Other: Receipt
+  } satisfies Record<BillCategory, typeof Receipt>;
+
+  return icons[category];
+}
+
+function billCategoryTone(category: BillCategory) {
+  const tones = {
+    Rent: "border-brand-200 text-brand-700",
+    "Car payment": "border-sky-200 text-sky-700",
+    "Car insurance": "border-violet-200 text-violet-700",
+    Phone: "border-cyan-200 text-cyan-700",
+    "Credit card": "border-amber-200 text-amber-700",
+    Loan: "border-amber-200 text-amber-700",
+    Gas: "border-amber-200 text-amber-700",
+    Food: "border-brand-200 text-brand-700",
+    Utilities: "border-amber-200 text-amber-700",
+    Other: "border-line text-neutral-600"
+  } satisfies Record<BillCategory, string>;
+
+  return tones[category];
+}
+
+function billStatusBadge(bill: BillOccurrence, today: string, language: string) {
+  if (bill.status === "paid") {
+    return { className: "badge-good", label: t(language, "paid"), icon: CheckCircle2 };
+  }
+
+  if (bill.occurrenceDate < today) {
+    return { className: "badge-danger", label: t(language, "overdue"), icon: Clock3 };
+  }
+
+  const dueDate = new Date(`${bill.occurrenceDate}T00:00:00`);
+  const todayDate = new Date(`${today}T00:00:00`);
+  const daysUntilDue = Math.ceil((dueDate.getTime() - todayDate.getTime()) / (24 * 60 * 60 * 1000));
+
+  if (daysUntilDue <= 7) {
+    return { className: "badge-warn", label: t(language, "dueSoon"), icon: Clock3 };
+  }
+
+  return { className: "badge-muted", label: t(language, "unpaid"), icon: Clock3 };
+}
+
 export default function BillsPage() {
   const router = useRouter();
   const { user, profile } = useAuth();
@@ -139,6 +202,7 @@ export default function BillsPage() {
   const canCreateBill = canAddBill(currentPlan, bills.length);
   const isRepeatingBill = form.recurrence !== "one-time";
   const repeatFrequencyValue = repeatFrequencyOptions.includes(form.recurrence) ? form.recurrence : "monthly";
+  const todayValue = toDateInputValue(new Date());
   const currentMonthValue = toDateInputValue().slice(0, 7);
   const selectedMonthRange = useMemo(() => getMonthRange(selectedMonth), [selectedMonth]);
   const monthlyBillOccurrences = useMemo(
@@ -159,7 +223,6 @@ export default function BillsPage() {
     [monthlyBillOccurrences]
   );
   const sortedBills = useMemo(() => {
-    const today = toDateInputValue(new Date());
     const dueSoonEnd = new Date();
     dueSoonEnd.setDate(dueSoonEnd.getDate() + 7);
     const dueSoonEndValue = toDateInputValue(dueSoonEnd);
@@ -173,7 +236,7 @@ export default function BillsPage() {
           return bill.status === "paid";
         }
         if (filter === "due_soon") {
-          return bill.status === "unpaid" && bill.occurrenceDate >= today && bill.occurrenceDate <= dueSoonEndValue;
+          return bill.status === "unpaid" && bill.occurrenceDate >= todayValue && bill.occurrenceDate <= dueSoonEndValue;
         }
         return true;
       })
@@ -183,7 +246,7 @@ export default function BillsPage() {
         }
         return a.occurrenceDate.localeCompare(b.occurrenceDate);
       });
-  }, [filter, monthlyBillOccurrences, sortBy]);
+  }, [filter, monthlyBillOccurrences, sortBy, todayValue]);
 
   async function loadBills() {
     if (!user) {
@@ -577,24 +640,38 @@ export default function BillsPage() {
               </button>
             </EmptyState>
           ) : (
-            sortedBills.map((bill: BillOccurrence) => (
-              <article key={`${bill.id}:${bill.occurrenceDate}`} className="card p-3">
+            sortedBills.map((bill: BillOccurrence) => {
+              const CategoryIcon = billCategoryIcon(bill.category);
+              const status = billStatusBadge(bill, todayValue, language);
+              const StatusIcon = status.icon;
+
+              return (
+              <article
+                key={`${bill.id}:${bill.occurrenceDate}`}
+                className={`card border-l-4 p-3 ${billCategoryTone(bill.category)}`}
+              >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-ink">{bill.name}</p>
-                    <p className="text-sm text-neutral-600">
-                      {t(language, "due")} {formatDate(bill.occurrenceDate, language)}
-                    </p>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className={`icon-chip-sm ${billCategoryTone(bill.category)}`}>
+                      <CategoryIcon size={17} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-ink">{bill.name}</p>
+                      <p className="text-sm text-neutral-600">
+                        {t(language, "due")} {formatDate(bill.occurrenceDate, language)}
+                      </p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
-                      <span className="rounded-full bg-neutral-50 px-2 py-1 text-neutral-600">
-                        {bill.status === "paid" ? t(language, "paid") : t(language, "unpaid")}
+                      <span className={`badge ${status.className}`}>
+                        <StatusIcon size={13} aria-hidden="true" />
+                        {status.label}
                       </span>
-                      <span className="rounded-full bg-neutral-50 px-2 py-1 text-neutral-600">
+                      <span className="badge badge-muted">
                         {billRecurrenceSummary(bill, language)}
                       </span>
-                      <span className="rounded-full bg-neutral-50 px-2 py-1 text-neutral-600">
+                      <span className="badge badge-muted">
                         {bill.category}
                       </span>
+                      </div>
                     </div>
                   </div>
                   <p className="text-lg font-bold text-ink">{formatCurrency(bill.amount, currency)}</p>
@@ -614,7 +691,8 @@ export default function BillsPage() {
                   </button>
                 </div>
               </article>
-            ))
+              );
+            })
           )}
         </section>
       </div>

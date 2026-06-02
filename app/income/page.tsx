@@ -1,6 +1,20 @@
 "use client";
 
-import { BarChart3, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  BarChart3,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Clock3,
+  DollarSign,
+  Fuel,
+  Pencil,
+  Plus,
+  Route,
+  Trash2,
+  TrendingUp
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
@@ -73,6 +87,18 @@ function formatSelectedMonth(monthValue: string, language: string) {
     month: "long",
     year: "numeric"
   }).format(new Date(year, month - 1, 1));
+}
+
+function incomeTypeBadgeClass(type: IncomeEntryType) {
+  if (type === "confirmed") {
+    return "badge-blue";
+  }
+
+  if (type === "extra_gig") {
+    return "badge-purple";
+  }
+
+  return "badge-good";
 }
 
 export default function IncomePage() {
@@ -333,32 +359,32 @@ export default function IncomePage() {
             />
           </label>
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "totalGross")}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><DollarSign size={15} aria-hidden="true" />{t(language, "totalGross")}</span>
               <span className="font-semibold text-ink">{formatCurrency(monthSummary.gross, currency)}</span>
             </p>
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "netProfit")}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><TrendingUp size={15} aria-hidden="true" />{t(language, "netProfit")}</span>
               <span className="font-semibold text-ink">{formatCurrency(monthSummary.net, currency)}</span>
             </p>
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "miles")}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><Route size={15} aria-hidden="true" />{t(language, "miles")}</span>
               <span className="font-semibold text-ink">{monthSummary.miles.toFixed(1)}</span>
             </p>
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "hours")}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><Clock3 size={15} aria-hidden="true" />{t(language, "hours")}</span>
               <span className="font-semibold text-ink">{formatDurationFromDecimalHours(monthSummary.hours)}</span>
             </p>
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "gasSpent")}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><Fuel size={15} aria-hidden="true" />{t(language, "gasSpent")}</span>
               <span className="font-semibold text-ink">{formatCurrency(monthSummary.gas, currency)}</span>
             </p>
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "extraExpenses")}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><BarChart3 size={15} aria-hidden="true" />{t(language, "extraExpenses")}</span>
               <span className="font-semibold text-ink">{formatCurrency(monthSummary.extra, currency)}</span>
             </p>
-            <p className="rounded-xl border border-line bg-neutral-50 p-3">
-              <span className="block text-neutral-500">{t(language, "entries")}</span>
+            <p className="metric-card">
+              <span className="mb-2 flex items-center gap-2 text-neutral-500"><BarChart3 size={15} aria-hidden="true" />{t(language, "entries")}</span>
               <span className="font-semibold text-ink">{monthSummary.count}</span>
             </p>
           </div>
@@ -544,25 +570,33 @@ export default function IncomePage() {
               return (
               <article key={entry.id} className="card p-3">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className={`icon-chip-sm ${incomeTypeBadgeClass(entry.income_entry_type)}`}>
+                      <DollarSign size={17} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
                     <p className="font-semibold text-ink">{entry.platform}</p>
                     <p className="text-sm text-neutral-600">
-                      {formatDate(entry.date, language)} - {incomeEntryTypeLabel(language, entry.income_entry_type)}
+                      {formatDate(entry.date, language)}
                     </p>
+                    <span className={`badge mt-2 ${incomeTypeBadgeClass(entry.income_entry_type)}`}>
+                      {incomeEntryTypeLabel(language, entry.income_entry_type)}
+                    </span>
+                    </div>
                   </div>
                   <p className="text-lg font-bold text-ink">{formatCurrency(entry.net_profit, currency)}</p>
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
-                  <p>
-                    <span className="block text-neutral-500">{t(language, "gross")}</span>
+                  <p className="metric-card p-2">
+                    <span className="flex items-center gap-1 text-neutral-500"><DollarSign size={13} aria-hidden="true" />{t(language, "gross")}</span>
                     <span className="font-semibold">{formatCurrency(entry.gross_earnings, currency)}</span>
                   </p>
-                  <p>
-                    <span className="block text-neutral-500">{t(language, "miles")}</span>
+                  <p className="metric-card p-2">
+                    <span className="flex items-center gap-1 text-neutral-500"><Route size={13} aria-hidden="true" />{t(language, "miles")}</span>
                     <span className="font-semibold">{entry.miles_driven}</span>
                   </p>
-                  <p>
-                    <span className="block text-neutral-500">{t(language, "netProfit")}</span>
+                  <p className="metric-card p-2">
+                    <span className="flex items-center gap-1 text-neutral-500"><TrendingUp size={13} aria-hidden="true" />{t(language, "netProfit")}</span>
                     <span className="font-semibold">{formatCurrency(entry.net_profit, currency)}</span>
                   </p>
                 </div>
