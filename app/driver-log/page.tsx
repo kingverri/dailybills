@@ -4,6 +4,7 @@ import { CalendarDays, ChevronDown, ChevronUp, ClipboardList, Pencil, Plus, Tras
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
+import { TimePicker12Hour } from "@/components/TimePicker12Hour";
 import { platforms, weeklySettlementDays } from "@/lib/constants";
 import {
   calculateDriverLogMetrics,
@@ -490,14 +491,16 @@ export default function DriverLogPage() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-2">
-                  <span className="field-label">{t(language, "startTime")}</span>
-                  <input className="field" type="time" value={form.start_time} onChange={(event) => setForm({ ...form, start_time: event.target.value })} />
-                </label>
-                <label className="block space-y-2">
-                  <span className="field-label">{t(language, "endTime")}</span>
-                  <input className="field" type="time" value={form.end_time} onChange={(event) => setForm({ ...form, end_time: event.target.value })} />
-                </label>
+                <TimePicker12Hour
+                  label={t(language, "startTime")}
+                  value={form.start_time}
+                  onChange={(value) => setForm({ ...form, start_time: value })}
+                />
+                <TimePicker12Hour
+                  label={t(language, "endTime")}
+                  value={form.end_time}
+                  onChange={(value) => setForm({ ...form, end_time: value })}
+                />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">

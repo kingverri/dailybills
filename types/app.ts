@@ -20,6 +20,7 @@ export type DayOfWeek = (typeof daysOfWeek)[number];
 export type BillRecurrence = (typeof billRecurrences)[number];
 export type BillCategory = (typeof billCategories)[number];
 export type BillStatus = (typeof billStatuses)[number];
+export type BillRepeatUntilType = "never" | "specific_month";
 export type FuelType = (typeof fuelTypes)[number];
 export type IncomeEntryType = (typeof incomeEntryTypes)[number]["value"];
 export type WeeklySettlementDay = (typeof weeklySettlementDays)[number];
@@ -68,6 +69,8 @@ export type Bill = {
   amount: number;
   due_date: string;
   recurrence: BillRecurrence;
+  repeat_until: string | null;
+  repeat_until_type: BillRepeatUntilType;
   category: BillCategory;
   status: BillStatus;
   notes: string | null;

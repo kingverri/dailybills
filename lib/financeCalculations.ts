@@ -201,6 +201,14 @@ function isBetweenInclusive(date: Date, start: Date, end: Date) {
   return date >= start && date <= end;
 }
 
+function getBillRepeatEndDate(bill: Bill) {
+  if (bill.repeat_until_type !== "specific_month" || !bill.repeat_until) {
+    return null;
+  }
+
+  return startOfDay(bill.repeat_until);
+}
+
 export function expandRecurringBillsWithinPeriod(bills: Bill[], from: DateLike, to: DateLike) {
   const start = startOfDay(from);
   const end = startOfDay(to);
@@ -210,9 +218,10 @@ export function expandRecurringBillsWithinPeriod(bills: Bill[], from: DateLike, 
     let due = startOfDay(bill.due_date);
     const firstDueDate = startOfDay(bill.due_date);
     const originalDueDate = toIsoDate(due);
+    const repeatEndDate = getBillRepeatEndDate(bill);
 
     const pushBill = (date: Date, inclusionReason: BillInclusionReason) => {
-      if (date >= firstDueDate && isBetweenInclusive(date, start, end)) {
+      if (date >= firstDueDate && (!repeatEndDate || date <= repeatEndDate) && isBetweenInclusive(date, start, end)) {
         occurrences.push({
           ...bill,
           originalDueDate,
@@ -242,6 +251,9 @@ export function expandRecurringBillsWithinPeriod(bills: Bill[], from: DateLike, 
             : "recurring_occurrence_in_projection_period"
         );
         due = addDays(due, intervalDays);
+        if (repeatEndDate && due > repeatEndDate) {
+          break;
+        }
       }
       continue;
     }
@@ -258,6 +270,9 @@ export function expandRecurringBillsWithinPeriod(bills: Bill[], from: DateLike, 
           : "recurring_occurrence_in_projection_period"
       );
       monthCursor = addMonths(monthCursor, 1);
+      if (repeatEndDate && monthCursor > repeatEndDate) {
+        break;
+      }
     }
   }
 

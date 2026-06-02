@@ -119,6 +119,8 @@ create table if not exists public.bills (
   amount numeric(12, 2) not null check (amount >= 0),
   due_date date not null,
   recurrence text not null default 'monthly' check (recurrence in ('monthly', 'weekly', 'biweekly', 'one-time', 'custom')),
+  repeat_until date,
+  repeat_until_type text not null default 'never' check (repeat_until_type in ('never', 'specific_month')),
   category text not null default 'Other' check (category in ('Rent', 'Car payment', 'Car insurance', 'Phone', 'Credit card', 'Loan', 'Gas', 'Food', 'Utilities', 'Other')),
   status text not null default 'unpaid' check (status in ('unpaid', 'paid')),
   notes text,

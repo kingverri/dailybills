@@ -6,19 +6,21 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { billCategories, billRecurrences, billStatuses } from "@/lib/constants";
-import { formatCurrency, formatDate, toDateInputValue } from "@/lib/format";
+import { billCategories, billStatuses } from "@/lib/constants";
+import { formatCurrency, formatDate, formatMonthYear, toDateInputValue } from "@/lib/format";
 import { billRecurrenceLabel, t } from "@/lib/i18n";
 import { canAddBill, getCurrentPlan } from "@/lib/planLimits";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
-import type { Bill, BillCategory, BillRecurrence, BillStatus } from "@/types/app";
+import type { Bill, BillCategory, BillRecurrence, BillRepeatUntilType, BillStatus } from "@/types/app";
 
 type BillForm = {
   name: string;
   amount: string;
   due_date: string;
   recurrence: BillRecurrence;
+  repeat_until_type: BillRepeatUntilType;
+  repeat_until_month: string;
   category: BillCategory;
   status: BillStatus;
   notes: string;
@@ -31,11 +33,44 @@ const initialForm: BillForm = {
   name: "",
   amount: "",
   due_date: toDateInputValue(),
-  recurrence: "monthly",
+  recurrence: "one-time",
+  repeat_until_type: "never",
+  repeat_until_month: "",
   category: "Rent",
   status: "unpaid",
   notes: ""
 };
+
+const repeatFrequencyOptions: BillRecurrence[] = ["monthly", "weekly", "biweekly"];
+
+function repeatUntilMonthFromBill(bill: Bill) {
+  return bill.repeat_until ? bill.repeat_until.slice(0, 7) : "";
+}
+
+function monthInputToLastDate(monthValue: string) {
+  const [year, month] = monthValue.split("-").map(Number);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month)) {
+    return null;
+  }
+
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}
+
+function billRecurrenceSummary(bill: Bill, language: string) {
+  if (bill.recurrence === "one-time" || bill.recurrence === "custom") {
+    return billRecurrenceLabel(language, bill.recurrence);
+  }
+
+  const base = billRecurrenceLabel(language, bill.recurrence);
+
+  if (bill.repeat_until_type === "specific_month" && bill.repeat_until) {
+    return `${base} · ${t(language, "ends")} ${formatMonthYear(bill.repeat_until, language)}`;
+  }
+
+  return `${base} · ${t(language, "noEndDate")}`;
+}
 
 export default function BillsPage() {
   const router = useRouter();
@@ -54,6 +89,8 @@ export default function BillsPage() {
   const language = profile?.language ?? "en";
   const currentPlan = getCurrentPlan(profile);
   const canCreateBill = canAddBill(currentPlan, bills.length);
+  const isRepeatingBill = form.recurrence !== "one-time";
+  const repeatFrequencyValue = repeatFrequencyOptions.includes(form.recurrence) ? form.recurrence : "monthly";
   const sortedBills = useMemo(() => {
     const today = toDateInputValue(new Date());
     const dueSoonEnd = new Date();
@@ -121,6 +158,8 @@ export default function BillsPage() {
       amount: String(bill.amount),
       due_date: bill.due_date,
       recurrence: bill.recurrence,
+      repeat_until_type: bill.repeat_until_type ?? "never",
+      repeat_until_month: repeatUntilMonthFromBill(bill),
       category: bill.category,
       status: bill.status,
       notes: bill.notes ?? ""
@@ -148,13 +187,24 @@ export default function BillsPage() {
       return;
     }
 
+    if (isRepeatingBill && form.repeat_until_type === "specific_month" && !form.repeat_until_month) {
+      setError(t(language, "fillRequiredFields"));
+      return;
+    }
+
     setSaving(true);
     const supabase = getSupabaseClient();
+    const repeatUntil =
+      isRepeatingBill && form.repeat_until_type === "specific_month"
+        ? monthInputToLastDate(form.repeat_until_month)
+        : null;
     const payload = {
       name: form.name.trim(),
       amount,
       due_date: form.due_date,
       recurrence: form.recurrence,
+      repeat_until: repeatUntil,
+      repeat_until_type: isRepeatingBill ? form.repeat_until_type : "never",
       category: form.category,
       status: form.status,
       notes: form.notes.trim() || null
@@ -244,13 +294,20 @@ export default function BillsPage() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-2">
-              <span className="field-label">{t(language, "recurrence")}</span>
-              <select className="field" value={form.recurrence} onChange={(event) => setForm({ ...form, recurrence: event.target.value as BillRecurrence })}>
-                {billRecurrences.map((value) => (
-                  <option key={value} value={value}>
-                    {billRecurrenceLabel(language, value)}
-                  </option>
-                ))}
+              <span className="field-label">{t(language, "repeatThisBill")}</span>
+              <select
+                className="field"
+                value={isRepeatingBill ? "yes" : "no"}
+                onChange={(event) =>
+                  setForm(
+                    event.target.value === "yes"
+                      ? { ...form, recurrence: repeatFrequencyValue }
+                      : { ...form, recurrence: "one-time", repeat_until_type: "never", repeat_until_month: "" }
+                  )
+                }
+              >
+                <option value="no">{t(language, "no")}</option>
+                <option value="yes">{t(language, "yes")}</option>
               </select>
             </label>
             <label className="block space-y-2">
@@ -262,6 +319,53 @@ export default function BillsPage() {
               </select>
             </label>
           </div>
+
+          {isRepeatingBill ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block space-y-2">
+                <span className="field-label">{t(language, "repeatFrequency")}</span>
+                <select
+                  className="field"
+                  value={repeatFrequencyValue}
+                  onChange={(event) => setForm({ ...form, recurrence: event.target.value as BillRecurrence })}
+                >
+                  {repeatFrequencyOptions.map((value) => (
+                    <option key={value} value={value}>
+                      {billRecurrenceLabel(language, value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block space-y-2">
+                <span className="field-label">{t(language, "whenDoesItEnd")}</span>
+                <select
+                  className="field"
+                  value={form.repeat_until_type}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      repeat_until_type: event.target.value as BillRepeatUntilType,
+                      repeat_until_month: event.target.value === "never" ? "" : form.repeat_until_month
+                    })
+                  }
+                >
+                  <option value="never">{t(language, "never")}</option>
+                  <option value="specific_month">{t(language, "endInSpecificMonth")}</option>
+                </select>
+              </label>
+              {form.repeat_until_type === "specific_month" ? (
+                <label className="block space-y-2 sm:col-span-2">
+                  <span className="field-label">{t(language, "lastMonth")}</span>
+                  <input
+                    className="field"
+                    type="month"
+                    value={form.repeat_until_month}
+                    onChange={(event) => setForm({ ...form, repeat_until_month: event.target.value })}
+                  />
+                </label>
+              ) : null}
+            </div>
+          ) : null}
 
           <label className="block space-y-2">
             <span className="field-label">{t(language, "status")}</span>
@@ -357,7 +461,7 @@ export default function BillsPage() {
                         {bill.status === "paid" ? t(language, "paid") : t(language, "unpaid")}
                       </span>
                       <span className="rounded-full bg-neutral-50 px-2 py-1 text-neutral-600">
-                        {billRecurrenceLabel(language, bill.recurrence)}
+                        {billRecurrenceSummary(bill, language)}
                       </span>
                     </div>
                   </div>
