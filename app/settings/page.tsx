@@ -69,6 +69,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [billingLoading, setBillingLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const language = profileForm.language;
@@ -330,6 +331,26 @@ export default function SettingsPage() {
     router.replace("/login");
   }
 
+  async function openBillingPortal() {
+    setError("");
+    setMessage("");
+    setBillingLoading(true);
+
+    try {
+      const response = await fetch("/api/stripe/create-portal-session", { method: "POST" });
+      const data = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error ?? t(language, "somethingWentWrong"));
+      }
+
+      window.location.href = data.url;
+    } catch (portalError) {
+      setError(portalError instanceof Error ? portalError.message : t(language, "somethingWentWrong"));
+      setBillingLoading(false);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -465,15 +486,25 @@ export default function SettingsPage() {
                   <Sparkles size={25} aria-hidden="true" />
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-neutral-600">
+                  <p className="text-sm font-bold text-neutral-600">{t(language, "billing")}</p>
+                  <p className="text-2xl font-black text-ink">
                     {t(language, "currentPlan")}: {t(language, currentPlanConfig.nameKey)}
                   </p>
-                  <p className="text-2xl font-black text-ink">{t(language, currentPlanConfig.nameKey)}</p>
+                  <p className="mt-1 text-sm font-semibold text-neutral-600">
+                    {t(language, "subscriptionStatus")}: {profile?.subscription_status ?? "free"}
+                  </p>
                 </div>
               </div>
-              <Link className="btn-primary" href="/pricing">
-                {t(language, "upgrade")}
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                {profile?.stripe_customer_id ? (
+                  <button className="btn-secondary" type="button" disabled={billingLoading} onClick={openBillingPortal}>
+                    {billingLoading ? t(language, "loading") : t(language, "manageBilling")}
+                  </button>
+                ) : null}
+                <Link className="btn-primary" href="/pricing">
+                  {t(language, "upgrade")}
+                </Link>
+              </div>
             </div>
           </div>
 

@@ -1,16 +1,76 @@
 "use client";
 
 import { Check, Sparkles, Wallet } from "lucide-react";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/components/auth-provider";
-import { plans, type PlanConfig } from "@/lib/plans";
+import { plans, type PlanConfig, type PlanId } from "@/lib/plans";
 import { t } from "@/lib/i18n";
+import { getCurrentPlan } from "@/lib/planLimits";
 
 export default function PricingPage() {
-  const { profile, user } = useAuth();
+  const router = useRouter();
+  const { profile, user, refreshProfile } = useAuth();
   const language = profile?.language ?? "en";
   const [message, setMessage] = useState("");
+  const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
+  const currentPlan = getCurrentPlan(profile);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const checkoutStatus = searchParams.get("checkout");
+
+    if (checkoutStatus === "success") {
+      setMessage(t(language, "paymentSuccessful"));
+      refreshProfile().catch(console.error);
+    }
+
+    if (checkoutStatus === "cancelled") {
+      setMessage(t(language, "paymentCancelled"));
+    }
+  }, [language, refreshProfile]);
+
+  async function startCheckout(plan: PlanId) {
+    setMessage("");
+
+    if (plan === "free") {
+      if (!user) {
+        router.push("/signup");
+        return;
+      }
+
+      setMessage(t(language, "currentPlanFree"));
+      return;
+    }
+
+    if (!user) {
+      setMessage(t(language, "loginAgain"));
+      return;
+    }
+
+    setLoadingPlan(plan);
+
+    try {
+      const response = await fetch("/api/stripe/create-checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ plan })
+      });
+      const data = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error ?? t(language, "somethingWentWrong"));
+      }
+
+      window.location.assign(data.url);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t(language, "somethingWentWrong"));
+      setLoadingPlan(null);
+    }
+  }
 
   return (
     <>
@@ -26,7 +86,14 @@ export default function PricingPage() {
 
       <section className="grid gap-4 lg:grid-cols-3">
         {plans.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} language={language} onPlaceholder={() => setMessage(t(language, "paymentsComingSoon"))} />
+          <PlanCard
+            key={plan.id}
+            plan={plan}
+            language={language}
+            isCurrentPlan={Boolean(user) && currentPlan === plan.id}
+            loading={loadingPlan === plan.id}
+            onChoose={() => startCheckout(plan.id)}
+          />
         ))}
       </section>
     </>
@@ -36,13 +103,24 @@ export default function PricingPage() {
 function PlanCard({
   plan,
   language,
-  onPlaceholder
+  isCurrentPlan,
+  loading,
+  onChoose
 }: {
   plan: PlanConfig;
   language: string;
-  onPlaceholder: () => void;
+  isCurrentPlan: boolean;
+  loading: boolean;
+  onChoose: () => void;
 }) {
   const isFree = plan.id === "free";
+  const buttonLabel = loading
+    ? t(language, "redirectingToCheckout")
+    : isCurrentPlan
+      ? t(language, "currentPlan")
+      : isFree
+        ? t(language, "startFree")
+        : t(language, plan.ctaKey);
 
   return (
     <article className={`card relative flex flex-col p-6 ${plan.isBestValue ? "border-brand-200 shadow-glow" : ""}`}>
@@ -75,8 +153,13 @@ function PlanCard({
         ))}
       </ul>
 
-      <button className={isFree ? "btn-secondary mt-6 w-full" : "btn-primary mt-6 w-full"} type="button" onClick={onPlaceholder}>
-        {isFree ? t(language, "currentPlan") : t(language, plan.ctaKey)}
+      <button
+        className={isFree ? "btn-secondary mt-6 w-full" : "btn-primary mt-6 w-full"}
+        type="button"
+        disabled={loading || isCurrentPlan}
+        onClick={onChoose}
+      >
+        {buttonLabel}
       </button>
     </article>
   );

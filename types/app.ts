@@ -44,6 +44,9 @@ export type Profile = {
   language: Language;
   theme: AppTheme;
   plan: UserPlan;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  subscription_status?: string | null;
   weekly_settlement_day: WeeklySettlementDay | null;
   onboarding_completed: boolean;
   created_at: string;
