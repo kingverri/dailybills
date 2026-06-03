@@ -4,7 +4,9 @@ import clsx from "clsx";
 import {
   ArrowRight,
   Activity,
+  AlertTriangle,
   BarChart3,
+  CalendarClock,
   CalendarDays,
   ChevronDown,
   ChevronUp,
@@ -15,6 +17,8 @@ import {
   Plus,
   Receipt,
   ShieldAlert,
+  ShieldCheck,
+  Target,
   Wallet
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -145,19 +149,22 @@ export default function DashboardPage() {
       label: t(language, "periodOnTrack"),
       helper: t(language, "riskLowHelper"),
       tone: "good" as const,
-      className: "border-brand-200 bg-brand-500/10 text-brand-700"
+      className: "border-emerald-300/40 bg-emerald-400/15 text-emerald-100",
+      icon: ShieldCheck
     },
     medium: {
       label: t(language, "periodClose"),
       helper: t(language, "riskMediumHelper"),
       tone: "warn" as const,
-      className: "border-amber-200 bg-amber-50 text-amber-800"
+      className: "border-amber-300/50 bg-amber-400/15 text-amber-100",
+      icon: AlertTriangle
     },
     high: {
       label: t(language, "periodBehind"),
       helper: t(language, "riskHighHelper"),
       tone: "danger" as const,
-      className: "border-red-200 bg-red-500/10 text-red-700"
+      className: "border-rose-300/50 bg-rose-500/15 text-rose-100",
+      icon: ShieldAlert
     }
   }[dashboard.cashFlow.riskLevel];
   const hasShortfall = dashboard.cashFlow.shortfall > 0;
@@ -165,9 +172,25 @@ export default function DashboardPage() {
   const periodResultValue = hasShortfall
     ? dashboard.cashFlow.shortfall
     : Math.max(0, dashboard.cashFlow.projectedBalanceAfterBills);
+  const daysUntilPeriodEnd = Math.max(
+    1,
+    Math.ceil((new Date(dashboard.cashFlow.endDate).getTime() - asOf.getTime()) / (1000 * 60 * 60 * 24))
+  );
+  const suggestedDailyTarget = hasShortfall ? dashboard.cashFlow.shortfall / daysUntilPeriodEnd : 0;
+  const periodEndDate = formatDate(dashboard.cashFlow.endDate, language);
+  const statusHeadline = hasShortfall
+    ? t(language, "periodShortfallHeadline", {
+        amount: formatCurrency(dashboard.cashFlow.shortfall, currency),
+        endDate: periodEndDate
+      })
+    : t(language, "periodCoveredHeadline");
   const recommendedAction = hasShortfall
-    ? `${t(language, "earnAtLeast")} ${formatCurrency(dashboard.cashFlow.shortfall, currency)} ${t(language, "toCoverPeriodBills")}`
-    : t(language, "coveredForUpcomingBillsPeriod");
+    ? t(language, "suggestedDailyAction", {
+        dailyTarget: formatCurrency(suggestedDailyTarget, currency),
+        endDate: periodEndDate
+      })
+    : t(language, "reserveMoneyAction");
+  const StatusIcon = statusCopy.icon;
 
   return (
     <>
@@ -260,62 +283,72 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <section className="card overflow-hidden p-0">
-            <div className="border-b border-line bg-neutral-50 p-5 sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-[#05070d] shadow-2xl shadow-emerald-950/20">
+            <div className="relative border-b border-white/10 bg-[radial-gradient(circle_at_12%_0%,rgba(34,197,94,0.26),transparent_28rem),radial-gradient(circle_at_86%_8%,rgba(56,189,248,0.2),transparent_24rem),linear-gradient(145deg,rgba(15,23,42,0.98),rgba(5,7,13,0.98))] p-5 text-white sm:p-7">
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.08),transparent_36%)]" />
+              <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-3">
-                  <span className="icon-chip">
-                    <ShieldAlert size={26} aria-hidden="true" />
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 shadow-lg shadow-emerald-500/10">
+                    <StatusIcon size={30} aria-hidden="true" />
                   </span>
                   <div>
-                    <p className="text-xs font-black uppercase tracking-wide text-neutral-500">{t(language, "periodStatus")}</p>
-                    <h2 className="mt-1 text-2xl font-black text-ink sm:text-3xl">{t(language, "canCoverUpcomingBills")}</h2>
-                    <p className="mt-1 text-sm font-medium text-neutral-600">{t(language, "projectionBasedOnIncomeBalanceBills")}</p>
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-200/90">{t(language, "periodStatus")}</p>
+                    <h2 className="mt-2 max-w-3xl text-2xl font-black leading-tight text-white sm:text-4xl">{statusHeadline}</h2>
+                    <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-300">{t(language, "projectionBasedOnIncomeBalanceBills")}</p>
                   </div>
                 </div>
-                <span className={clsx("inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-sm font-black", statusCopy.className)}>
+                <span className={clsx("inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-black backdrop-blur", statusCopy.className)}>
                   <Activity size={15} aria-hidden="true" />
                   {statusCopy.label}
                 </span>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <DashboardMetric
-                  icon={PiggyBank}
-                  label={t(language, "projectedCash")}
-                  value={formatCurrency(dashboard.cashFlow.projectedCash, currency)}
-                  helper={`${projectionPeriodLabel(language, dashboard.cashFlow.period)} · ${formatDate(dashboard.cashFlow.startDate, language)} - ${formatDate(
-                    dashboard.cashFlow.endDate,
-                    language
-                  )}`}
-                  tone="good"
-                />
+              <div className="relative mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <DashboardMetric
                   icon={Receipt}
                   label={t(language, "billsInPeriod")}
                   value={formatCurrency(dashboard.includedBillsTotal, currency)}
-                  helper={t(language, "upcomingUnpaidBills")}
+                  helper={`${projectionPeriodLabel(language, dashboard.cashFlow.period)} · ${formatDate(dashboard.cashFlow.startDate, language)} - ${formatDate(
+                    dashboard.cashFlow.endDate,
+                    language
+                  )}`}
+                  tone="cyan"
+                  inverted
                 />
                 <DashboardMetric
-                  icon={hasShortfall ? ShieldAlert : CheckCircle2}
+                  icon={hasShortfall ? AlertTriangle : CheckCircle2}
                   label={periodResultLabel}
                   value={formatCurrency(periodResultValue, currency)}
                   helper={hasShortfall ? t(language, "amountNeededToCoverBills") : t(language, "afterBillsSelectedPeriod")}
                   tone={hasShortfall ? "danger" : "good"}
+                  inverted
                 />
                 <DashboardMetric
-                  icon={Wallet}
-                  label={t(language, "needToEarnToday")}
-                  value={formatCurrency(dashboard.cashFlow.needToEarnToday, currency)}
-                  helper={t(language, "neededTodayToCoverPeriod")}
-                  tone={dashboard.cashFlow.needToEarnToday > 0 ? "warn" : "neutral"}
+                  icon={Target}
+                  label={t(language, "suggestedDailyTarget")}
+                  value={`${formatCurrency(suggestedDailyTarget, currency)}/${t(language, "dayShort")}`}
+                  helper={t(language, "toCoverBillsBy", { endDate: periodEndDate })}
+                  tone={hasShortfall ? "warn" : "neutral"}
+                  inverted
+                />
+                <DashboardMetric
+                  icon={CalendarClock}
+                  label={t(language, "nextCriticalBill")}
+                  value={dashboard.nextBill ? formatCurrency(dashboard.nextBill.amount, currency) : "-"}
+                  helper={
+                    dashboard.nextBill
+                      ? `${dashboard.nextBill.name} - ${formatDate(dashboard.nextBill.occurrenceDate, language)}`
+                      : t(language, "noUnpaidBillsYet")
+                  }
+                  tone={dashboard.nextBill?.daysRemaining !== undefined && dashboard.nextBill.daysRemaining <= 7 ? "warn" : "neutral"}
+                  inverted
                 />
               </div>
 
               <div
                 className={clsx(
-                  "mt-4 rounded-[1.25rem] border p-4 text-sm font-semibold",
-                  hasShortfall ? "border-red-200 bg-red-500/10 text-red-700" : "border-brand-200 bg-brand-500/10 text-brand-700"
+                  "relative mt-5 rounded-[1.35rem] border p-4 text-sm font-semibold backdrop-blur",
+                  hasShortfall ? "border-rose-300/30 bg-rose-500/10 text-rose-100" : "border-emerald-300/30 bg-emerald-400/10 text-emerald-100"
                 )}
               >
                 <p className="text-xs font-black uppercase tracking-wide opacity-80">{t(language, "recommendedAction")}</p>
@@ -323,7 +356,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="p-5 sm:p-6">
+            <div className="bg-surface p-5 sm:p-6">
               <button
                 className="flex w-full items-center justify-between gap-3 text-left text-sm font-semibold text-brand-700"
                 type="button"
@@ -394,6 +427,7 @@ export default function DashboardPage() {
             </div>
           </section>
 
+          <div className="grid gap-5 lg:grid-cols-2">
           <section className="card p-5 sm:p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-brand-700">
@@ -430,15 +464,7 @@ export default function DashboardPage() {
                   <p className="text-2xl font-black text-ink">{formatCurrency(dashboard.nextBill.amount, currency)}</p>
                 </div>
                 <div className="rounded-[1.25rem] border border-line bg-neutral-50 p-4">
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="font-semibold text-neutral-600">{t(language, "projectedCash")}</span>
-                    <span className="font-black text-ink">{formatCurrency(dashboard.cashFlow.projectedCash, currency)}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-                    <span className="font-semibold text-neutral-600">{t(language, "billsInPeriod")}</span>
-                    <span className="font-black text-ink">{formatCurrency(dashboard.includedBillsTotal, currency)}</span>
-                  </div>
-                  <div className="mt-3 h-3 overflow-hidden rounded-md bg-neutral-100">
+                  <div className="h-3 overflow-hidden rounded-md bg-neutral-100">
                     <div
                       className={clsx("h-full rounded-md", dashboard.cashFlow.shortfall > 0 ? "bg-fuel-500" : "bg-brand-600")}
                       style={{ width: `${dashboard.billProgress}%` }}
@@ -514,10 +540,11 @@ export default function DashboardPage() {
               ) : null}
             </div>
           </section>
+          </div>
 
-          <Link className="card flex items-center justify-between gap-4 p-5 transition hover:-translate-y-0.5 hover:border-brand-200 hover:bg-brand-50" href="/driver-log">
+          <Link className="group flex items-center justify-between gap-4 rounded-[1.7rem] border border-brand-200/70 bg-gradient-to-br from-brand-50 to-neutral-50 p-5 shadow-card transition hover:-translate-y-0.5 hover:shadow-glow" href="/driver-log">
             <div className="flex items-center gap-3">
-              <span className="icon-chip">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-500 to-cyan-400 text-slate-950 shadow-glow transition group-hover:scale-105">
                 <ClipboardList size={28} aria-hidden="true" />
               </span>
               <div>
@@ -558,39 +585,49 @@ function DashboardMetric({
   value,
   helper,
   icon: Icon,
-  tone = "neutral"
+  tone = "neutral",
+  inverted = false
 }: {
   label: string;
   value: string;
   helper?: string;
   icon?: LucideIcon;
-  tone?: "neutral" | "good" | "warn" | "danger";
+  tone?: "neutral" | "good" | "warn" | "danger" | "cyan";
+  inverted?: boolean;
 }) {
+  const cleanHelper = helper?.replace(/\u00c2/g, "");
+
   return (
     <div
       className={clsx(
-        "rounded-[1.35rem] border border-line bg-neutral-50 p-4 shadow-sm",
-        tone === "good" && "border-brand-200",
-        tone === "warn" && "border-amber-200",
-        tone === "danger" && "border-red-200"
+        "rounded-[1.35rem] border p-4 shadow-sm",
+        inverted ? "border-white/10 bg-white/[0.07] text-white backdrop-blur" : "border-line bg-neutral-50",
+        tone === "good" && (inverted ? "border-emerald-300/25" : "border-brand-200"),
+        tone === "warn" && (inverted ? "border-amber-300/30" : "border-amber-200"),
+        tone === "danger" && (inverted ? "border-rose-300/30" : "border-red-200"),
+        tone === "cyan" && (inverted ? "border-cyan-300/30" : "border-cyan-500")
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-black uppercase tracking-wide text-neutral-500">{label}</p>
+        <p className={clsx("text-xs font-black uppercase tracking-wide", inverted ? "text-slate-300" : "text-neutral-500")}>{label}</p>
         {Icon ? (
           <span
             className={clsx(
-              "icon-chip-sm",
-              tone === "warn" && "border-amber-200 bg-amber-50 text-amber-700",
-              tone === "danger" && "border-red-200 bg-red-50 text-red-700"
+              "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border shadow-sm",
+              inverted && "border-white/10 bg-white/10 text-white",
+              !inverted && "border-brand-200 bg-brand-50 text-brand-700",
+              tone === "good" && (inverted ? "text-emerald-200" : "border-brand-200 bg-brand-50 text-brand-700"),
+              tone === "warn" && (inverted ? "text-amber-200" : "border-amber-200 bg-amber-50 text-amber-700"),
+              tone === "danger" && (inverted ? "text-rose-200" : "border-red-200 bg-red-50 text-red-700"),
+              tone === "cyan" && (inverted ? "text-cyan-200" : "border-cyan-500 bg-brand-50 text-cyan-500")
             )}
           >
-            <Icon size={19} aria-hidden="true" />
+            <Icon size={22} aria-hidden="true" />
           </span>
         ) : null}
       </div>
-      <p className="mt-3 text-2xl font-black text-ink">{value}</p>
-      {helper ? <p className="mt-1 text-xs font-semibold text-neutral-500">{helper}</p> : null}
+      <p className={clsx("mt-3 text-2xl font-black", inverted ? "text-white" : "text-ink")}>{value}</p>
+      {cleanHelper ? <p className={clsx("mt-1 text-xs font-semibold leading-5", inverted ? "text-slate-300" : "text-neutral-500")}>{cleanHelper}</p> : null}
     </div>
   );
 }
