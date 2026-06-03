@@ -58,6 +58,23 @@ export async function createStripeFormRequest<T>(path: string, params: URLSearch
   return data;
 }
 
+export async function getStripeRequest<T>(path: string) {
+  const response = await fetch(`${STRIPE_API_BASE}${path}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${getStripeSecretKey()}`
+    }
+  });
+
+  const data = (await response.json().catch(() => ({}))) as T & { error?: { message?: string } };
+
+  if (!response.ok) {
+    throw new Error(data.error?.message ?? "Stripe request failed.");
+  }
+
+  return data;
+}
+
 export function verifyStripeSignature(payload: string, signatureHeader: string | null, webhookSecret: string) {
   if (!signatureHeader) {
     return false;

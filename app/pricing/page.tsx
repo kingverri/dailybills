@@ -16,6 +16,7 @@ export default function PricingPage() {
   const [message, setMessage] = useState("");
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
   const currentPlan = getCurrentPlan(profile);
+  const isPaidPlan = currentPlan === "pro_monthly" || currentPlan === "pro_yearly";
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -31,12 +32,45 @@ export default function PricingPage() {
     }
   }, [language, refreshProfile]);
 
-  async function startCheckout(plan: PlanId) {
+  async function openBillingPortal(plan: PlanId) {
     setMessage("");
+    setLoadingPlan(plan);
+
+    try {
+      const response = await fetch("/api/stripe/create-portal-session", { method: "POST" });
+      const data = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error ?? t(language, "somethingWentWrong"));
+      }
+
+      window.location.assign(data.url);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t(language, "somethingWentWrong"));
+      setLoadingPlan(null);
+    }
+  }
+
+  async function choosePlan(plan: PlanId) {
+    setMessage("");
+
+    if (user && currentPlan === plan) {
+      return;
+    }
 
     if (plan === "free") {
       if (!user) {
         router.push("/signup");
+        return;
+      }
+
+      if (isPaidPlan) {
+        if (!profile?.stripe_customer_id) {
+          setMessage(t(language, "billingDataIncomplete"));
+          return;
+        }
+
+        await openBillingPortal(plan);
         return;
       }
 
@@ -46,6 +80,16 @@ export default function PricingPage() {
 
     if (!user) {
       setMessage(t(language, "loginAgain"));
+      return;
+    }
+
+    if (isPaidPlan) {
+      if (!profile?.stripe_customer_id) {
+        setMessage(t(language, "billingDataIncomplete"));
+        return;
+      }
+
+      await openBillingPortal(plan);
       return;
     }
 
@@ -90,9 +134,10 @@ export default function PricingPage() {
             key={plan.id}
             plan={plan}
             language={language}
+            currentPlan={currentPlan}
             isCurrentPlan={Boolean(user) && currentPlan === plan.id}
             loading={loadingPlan === plan.id}
-            onChoose={() => startCheckout(plan.id)}
+            onChoose={() => choosePlan(plan.id)}
           />
         ))}
       </section>
@@ -103,24 +148,20 @@ export default function PricingPage() {
 function PlanCard({
   plan,
   language,
+  currentPlan,
   isCurrentPlan,
   loading,
   onChoose
 }: {
   plan: PlanConfig;
   language: string;
+  currentPlan: PlanId;
   isCurrentPlan: boolean;
   loading: boolean;
   onChoose: () => void;
 }) {
   const isFree = plan.id === "free";
-  const buttonLabel = loading
-    ? t(language, "redirectingToCheckout")
-    : isCurrentPlan
-      ? t(language, "currentPlan")
-      : isFree
-        ? t(language, "startFree")
-        : t(language, plan.ctaKey);
+  const buttonLabel = loading ? t(language, "redirectingToCheckout") : getPlanButtonLabel(language, currentPlan, plan.id, isCurrentPlan);
 
   return (
     <article className={`card relative flex flex-col p-6 ${plan.isBestValue ? "border-brand-200 shadow-glow" : ""}`}>
@@ -163,4 +204,36 @@ function PlanCard({
       </button>
     </article>
   );
+}
+
+function getPlanButtonLabel(language: string, currentPlan: PlanId, planId: PlanId, isCurrentPlan: boolean) {
+  if (isCurrentPlan) {
+    return t(language, "currentPlan");
+  }
+
+  if (currentPlan === "pro_monthly") {
+    if (planId === "free") {
+      return t(language, "downgradeToFree");
+    }
+
+    if (planId === "pro_yearly") {
+      return t(language, "upgradeToProYearly");
+    }
+  }
+
+  if (currentPlan === "pro_yearly") {
+    if (planId === "free") {
+      return t(language, "downgradeToFree");
+    }
+
+    if (planId === "pro_monthly") {
+      return t(language, "switchToMonthly");
+    }
+  }
+
+  if (planId === "free") {
+    return t(language, "startFree");
+  }
+
+  return planId === "pro_monthly" ? t(language, "upgradeToProMonthly") : t(language, "getBestValue");
 }

@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { currencies, daysOfWeek, incomeTypes, paymentScheduleTypes, workTypes } from "@/lib/constants";
 import { formatCurrency, formatDate, toDateInputValue } from "@/lib/format";
-import { dayOfWeekLabel, languages, scheduleTypeLabel, t } from "@/lib/i18n";
+import { dayOfWeekLabel, languages, scheduleTypeLabel, subscriptionStatusLabel, t } from "@/lib/i18n";
 import { getCurrentPlan } from "@/lib/planLimits";
 import { plans } from "@/lib/plans";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -75,6 +75,13 @@ export default function SettingsPage() {
   const language = profileForm.language;
   const currentPlan = getCurrentPlan(profile);
   const currentPlanConfig = plans.find((plan) => plan.id === currentPlan) ?? plans[0];
+  const isPaidPlan = currentPlan === "pro_monthly" || currentPlan === "pro_yearly";
+  const rawSubscriptionStatus = profile?.subscription_status ?? "free";
+  const displaySubscriptionStatus =
+    isPaidPlan && (!profile?.subscription_status || profile.subscription_status === "free")
+      ? "active"
+      : rawSubscriptionStatus;
+  const hasBillingPortal = Boolean(profile?.stripe_customer_id);
 
   useEffect(() => {
     if (profile) {
@@ -344,7 +351,7 @@ export default function SettingsPage() {
         throw new Error(data.error ?? t(language, "somethingWentWrong"));
       }
 
-      window.location.href = data.url;
+      window.location.assign(data.url);
     } catch (portalError) {
       setError(portalError instanceof Error ? portalError.message : t(language, "somethingWentWrong"));
       setBillingLoading(false);
@@ -491,19 +498,26 @@ export default function SettingsPage() {
                     {t(language, "currentPlan")}: {t(language, currentPlanConfig.nameKey)}
                   </p>
                   <p className="mt-1 text-sm font-semibold text-neutral-600">
-                    {t(language, "subscriptionStatus")}: {profile?.subscription_status ?? "free"}
+                    {t(language, "subscriptionStatus")}: {subscriptionStatusLabel(language, displaySubscriptionStatus)}
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                {profile?.stripe_customer_id ? (
+                {isPaidPlan && hasBillingPortal ? (
                   <button className="btn-secondary" type="button" disabled={billingLoading} onClick={openBillingPortal}>
                     {billingLoading ? t(language, "loading") : t(language, "manageBilling")}
                   </button>
                 ) : null}
-                <Link className="btn-primary" href="/pricing">
-                  {t(language, "upgrade")}
-                </Link>
+                {isPaidPlan && !hasBillingPortal ? (
+                  <p className="max-w-sm rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-700">
+                    {t(language, "billingDataIncomplete")}
+                  </p>
+                ) : null}
+                {!isPaidPlan ? (
+                  <Link className="btn-primary" href="/pricing">
+                    {t(language, "upgrade")}
+                  </Link>
+                ) : null}
               </div>
             </div>
           </div>

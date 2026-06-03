@@ -45,6 +45,8 @@ export async function POST(request: Request) {
     params.set("client_reference_id", user.id);
     params.set("metadata[user_id]", user.id);
     params.set("metadata[plan]", body.plan);
+    params.set("subscription_data[metadata][user_id]", user.id);
+    params.set("subscription_data[metadata][plan]", body.plan);
     params.set("success_url", `${appUrl}/settings?checkout=success`);
     params.set("cancel_url", `${appUrl}/pricing?checkout=cancelled`);
 
