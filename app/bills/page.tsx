@@ -2,10 +2,8 @@
 
 import {
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   CircleDollarSign,
   Clock3,
   CreditCard,
@@ -23,6 +21,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { AppActionPanel, AppFilterBar, AppListCard, AppMetricCard } from "@/components/app-ui";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { billCategories, billStatuses } from "@/lib/constants";
@@ -430,26 +429,22 @@ export default function BillsPage() {
         subtitle={t(language, "billsSubtitle")}
         showBackToDashboard
         backToDashboardLabel={t(language, "backToDashboard")}
-      />
+      >
+        <button className="btn-primary" type="button" onClick={() => setShowForm(true)}>
+          <Plus size={18} aria-hidden="true" />
+          {t(language, "addBill")}
+        </button>
+      </PageHeader>
 
       <div className="space-y-5">
-        <section className="card p-5">
-          <button
-            className="flex w-full items-center justify-between gap-3 text-left"
-            type="button"
-            onClick={() => setShowForm((value) => !value)}
-          >
-            <span className="flex items-center gap-3 text-lg font-black text-ink">
-              <span className="icon-chip-sm">
-                <Plus size={20} aria-hidden="true" />
-              </span>
-              {editingId ? t(language, "editBill") : t(language, "addBillForm")}
-            </span>
-            {showForm ? <ChevronUp className="text-brand-700" size={20} aria-hidden="true" /> : <ChevronDown className="text-brand-700" size={20} aria-hidden="true" />}
-          </button>
-
-          {showForm ? (
-            <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
+        <AppActionPanel
+          icon={Plus}
+          title={editingId ? t(language, "editBill") : t(language, "addBillForm")}
+          subtitle={t(language, "noBillsHelper")}
+          expanded={showForm}
+          onToggle={() => setShowForm((value) => !value)}
+        >
+            <form className="space-y-4" onSubmit={handleSubmit}>
 
           <label className="block space-y-2">
             <span className="field-label">{t(language, "billName")}</span>
@@ -583,8 +578,7 @@ export default function BillsPage() {
             </Link>
           </div>
             </form>
-          ) : null}
-        </section>
+        </AppActionPanel>
 
         <section className="card space-y-4 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -628,34 +622,20 @@ export default function BillsPage() {
             />
           </label>
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><CircleDollarSign size={18} aria-hidden="true" />{t(language, "totalForMonth")}</span>
-              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.total, currency)}</span>
-            </p>
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><CheckCircle2 size={18} aria-hidden="true" />{t(language, "paid")}</span>
-              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.paid, currency)}</span>
-            </p>
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><Clock3 size={18} aria-hidden="true" />{t(language, "unpaid")}</span>
-              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.unpaid, currency)}</span>
-            </p>
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><Receipt size={18} aria-hidden="true" />{t(language, "bills")}</span>
-              <span className="text-lg font-black text-ink">{monthSummary.count}</span>
-            </p>
+            <AppMetricCard compact icon={CircleDollarSign} label={t(language, "totalForMonth")} value={formatCurrency(monthSummary.total, currency)} tone="cyan" />
+            <AppMetricCard compact icon={CheckCircle2} label={t(language, "paid")} value={formatCurrency(monthSummary.paid, currency)} tone="green" />
+            <AppMetricCard compact icon={Clock3} label={t(language, "unpaid")} value={formatCurrency(monthSummary.unpaid, currency)} tone="amber" />
+            <AppMetricCard compact icon={Receipt} label={t(language, "bills")} value={monthSummary.count} tone="purple" />
           </div>
         </section>
 
         <section className="space-y-3">
-          <div className="card space-y-3 p-3">
+          <AppFilterBar>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {(["all", "unpaid", "paid", "due_soon"] as BillFilter[]).map((value) => (
                 <button
                   key={value}
-                  className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                    filter === value ? "border border-brand-200 bg-brand-50 text-brand-700 shadow-glow" : "border border-line bg-neutral-50 text-neutral-600 hover:text-ink"
-                  }`}
+                  className={`filter-pill ${filter === value ? "filter-pill-active" : ""}`}
                   type="button"
                   onClick={() => setFilter(value)}
                 >
@@ -673,7 +653,7 @@ export default function BillsPage() {
               <option value="due_date">{t(language, "dueDate")}</option>
               <option value="amount">{t(language, "amount")}</option>
             </select>
-          </div>
+          </AppFilterBar>
           {loading ? (
             <div className="card p-5 text-sm text-neutral-600">{t(language, "loadingBills")}</div>
           ) : sortedBills.length === 0 ? (
@@ -690,9 +670,9 @@ export default function BillsPage() {
               const StatusIcon = status.icon;
 
               return (
-              <article
+              <AppListCard
                 key={`${bill.id}:${bill.occurrenceDate}`}
-                className={`card border-l-4 p-4 transition hover:-translate-y-0.5 ${billCategoryTone(bill.category)}`}
+                className={`border-l-4 ${billCategoryTone(bill.category)}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
@@ -734,7 +714,7 @@ export default function BillsPage() {
                     {t(language, "delete")}
                   </button>
                 </div>
-              </article>
+              </AppListCard>
               );
             })
           )}

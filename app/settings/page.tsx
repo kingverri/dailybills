@@ -4,6 +4,7 @@ import { CalendarDays, LogOut, Pencil, Plus, Sparkles, Trash2, UserRound, Wallet
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AppSectionCard } from "@/components/app-ui";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -380,7 +381,7 @@ export default function SettingsPage() {
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,420px)_1fr]">
-        <form className="card space-y-4 p-5" onSubmit={saveProfile}>
+        <form className="card app-section-card space-y-5 p-5" onSubmit={saveProfile}>
           <div className="flex items-start gap-3">
             <span className="icon-chip-sm">
               <UserRound size={20} aria-hidden="true" />
@@ -391,16 +392,21 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          <div className="rounded-[1.35rem] border border-line bg-neutral-50/60 p-4">
+            <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "personalInfo")}</p>
           <label className="block space-y-2">
             <span className="field-label">{t(language, "fullName")}</span>
             <input className="field" value={profileForm.full_name} onChange={(event) => setProfileForm({ ...profileForm, full_name: event.target.value })} />
           </label>
 
-          <label className="block space-y-2">
+          <label className="mt-3 block space-y-2">
             <span className="field-label">{t(language, "currentCashBalance")}</span>
             <input className="field" inputMode="decimal" value={profileForm.current_balance} onChange={(event) => setProfileForm({ ...profileForm, current_balance: event.target.value })} />
           </label>
+          </div>
 
+          <div className="rounded-[1.35rem] border border-line bg-neutral-50/60 p-4">
+            <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "workProfile")}</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-2">
               <span className="field-label">{t(language, "mainIncomeType")}</span>
@@ -419,7 +425,10 @@ export default function SettingsPage() {
               </select>
             </label>
           </div>
+          </div>
 
+          <div className="rounded-[1.35rem] border border-line bg-neutral-50/60 p-4">
+            <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "location")}</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-2">
               <span className="field-label">{t(language, "currency")}</span>
@@ -445,7 +454,10 @@ export default function SettingsPage() {
               <input className="field" value={profileForm.city} onChange={(event) => setProfileForm({ ...profileForm, city: event.target.value })} />
             </label>
           </div>
+          </div>
 
+          <div className="rounded-[1.35rem] border border-line bg-neutral-50/60 p-4">
+            <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "appPreferences")}</p>
           <label className="block space-y-2">
             <span className="field-label">{t(language, "language")}</span>
             <select
@@ -473,6 +485,7 @@ export default function SettingsPage() {
               <option value="light">{t(language, "lightTheme")}</option>
             </select>
           </label>
+          </div>
 
           <div className="flex flex-wrap gap-2">
             <button className="btn-primary flex-1" type="submit" disabled={savingProfile}>
@@ -486,7 +499,7 @@ export default function SettingsPage() {
         </form>
 
         <section className="space-y-5">
-          <div className="card p-5">
+          <AppSectionCard icon={Sparkles} title={t(language, "billing")} subtitle={t(language, "pricingSubtitle")}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <span className="icon-chip">
@@ -520,7 +533,7 @@ export default function SettingsPage() {
                 ) : null}
               </div>
             </div>
-          </div>
+          </AppSectionCard>
 
           <form className="card space-y-4 p-5" onSubmit={saveSchedule}>
             <div className="flex items-start gap-3">

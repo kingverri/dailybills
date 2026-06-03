@@ -164,13 +164,24 @@ function PlanCard({
   const buttonLabel = loading ? t(language, "redirectingToCheckout") : getPlanButtonLabel(language, currentPlan, plan.id, isCurrentPlan);
 
   return (
-    <article className={`card relative flex flex-col p-6 ${plan.isBestValue ? "border-brand-200 shadow-glow" : ""}`}>
-      {plan.isBestValue ? (
-        <span className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-700">
-          <Sparkles size={14} aria-hidden="true" />
-          {t(language, "bestValue")}
-        </span>
-      ) : null}
+    <article
+      className={`card relative flex flex-col p-6 transition hover:-translate-y-1 ${
+        plan.isBestValue ? "border-brand-200 shadow-glow" : ""
+      } ${isCurrentPlan ? "ring-2 ring-brand-200" : ""}`}
+    >
+      <div className="absolute right-4 top-4 flex flex-wrap justify-end gap-2">
+        {isCurrentPlan ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-sky-300/60 bg-sky-500/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-sky-600">
+            {t(language, "currentPlan")}
+          </span>
+        ) : null}
+        {plan.isBestValue ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-700">
+            <Sparkles size={14} aria-hidden="true" />
+            {t(language, "bestValue")}
+          </span>
+        ) : null}
+      </div>
 
       <div className="pr-24">
         <span className={plan.isBestValue ? "icon-chip" : "icon-chip-sm"}>

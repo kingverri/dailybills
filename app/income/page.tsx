@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { AppActionPanel, AppFilterBar, AppListCard, AppMetricCard, AppSectionCard } from "@/components/app-ui";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
@@ -314,7 +315,12 @@ export default function IncomePage() {
         subtitle={t(language, "incomeSubtitle")}
         showBackToDashboard
         backToDashboardLabel={t(language, "backToDashboard")}
-      />
+      >
+        <button className="btn-primary" type="button" onClick={() => setShowForm(true)}>
+          <Plus size={18} aria-hidden="true" />
+          {t(language, "addIncome")}
+        </button>
+      </PageHeader>
 
       <div className="space-y-5">
         <section className="card space-y-4 p-5">
@@ -359,49 +365,21 @@ export default function IncomePage() {
             />
           </label>
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><DollarSign size={15} aria-hidden="true" />{t(language, "totalGross")}</span>
-              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.gross, currency)}</span>
-            </p>
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><TrendingUp size={15} aria-hidden="true" />{t(language, "netProfit")}</span>
-              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.net, currency)}</span>
-            </p>
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><Route size={15} aria-hidden="true" />{t(language, "miles")}</span>
-              <span className="text-lg font-black text-ink">{monthSummary.miles.toFixed(1)}</span>
-            </p>
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><Clock3 size={15} aria-hidden="true" />{t(language, "hours")}</span>
-              <span className="text-lg font-black text-ink">{formatDurationFromDecimalHours(monthSummary.hours)}</span>
-            </p>
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><Fuel size={15} aria-hidden="true" />{t(language, "gasSpent")}</span>
-              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.gas, currency)}</span>
-            </p>
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><BarChart3 size={15} aria-hidden="true" />{t(language, "extraExpenses")}</span>
-              <span className="text-lg font-black text-ink">{formatCurrency(monthSummary.extra, currency)}</span>
-            </p>
-            <p className="metric-card">
-              <span className="mb-2 flex items-center gap-2 text-neutral-500"><BarChart3 size={15} aria-hidden="true" />{t(language, "entries")}</span>
-              <span className="text-lg font-black text-ink">{monthSummary.count}</span>
-            </p>
+            <AppMetricCard compact icon={DollarSign} label={t(language, "totalGross")} value={formatCurrency(monthSummary.gross, currency)} tone="cyan" />
+            <AppMetricCard compact icon={TrendingUp} label={t(language, "netProfit")} value={formatCurrency(monthSummary.net, currency)} tone="green" />
+            <AppMetricCard compact icon={Route} label={t(language, "miles")} value={monthSummary.miles.toFixed(1)} tone="purple" />
+            <AppMetricCard compact icon={Clock3} label={t(language, "hours")} value={formatDurationFromDecimalHours(monthSummary.hours)} tone="amber" />
+            <AppMetricCard compact icon={Fuel} label={t(language, "gasSpent")} value={formatCurrency(monthSummary.gas, currency)} tone="amber" />
+            <AppMetricCard compact icon={BarChart3} label={t(language, "extraExpenses")} value={formatCurrency(monthSummary.extra, currency)} tone="red" />
+            <AppMetricCard compact icon={BarChart3} label={t(language, "entries")} value={monthSummary.count} tone="neutral" />
           </div>
         </section>
 
-        <section className="card p-5">
-          <div className="mb-4 flex items-start gap-3">
-            <span className="icon-chip-sm">
-              <BarChart3 size={20} aria-hidden="true" />
-            </span>
-            <div>
-            <h2 className="text-lg font-black text-ink">{t(language, "exportIncome")}</h2>
-            <p className="mt-1 text-sm font-medium text-neutral-600">
-              {t(language, "selectedMonth")}: {formatSelectedMonth(selectedMonth, language)}
-            </p>
-            </div>
-          </div>
+        <AppSectionCard
+          icon={BarChart3}
+          title={t(language, "exportIncome")}
+          subtitle={`${t(language, "selectedMonth")}: ${formatSelectedMonth(selectedMonth, language)}`}
+        >
           {exportError ? <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{exportError}</p> : null}
           <div className="mt-4 flex flex-wrap gap-2">
             <button className="btn-secondary" type="button" onClick={() => handleExport("csv")}>
@@ -414,25 +392,16 @@ export default function IncomePage() {
               {t(language, "exportGoogleSheets")}
             </button>
           </div>
-        </section>
+        </AppSectionCard>
 
-        <section className="card p-5">
-          <button
-            className="flex w-full items-center justify-between gap-3 text-left"
-            type="button"
-            onClick={() => setShowForm((value) => !value)}
-          >
-            <span className="flex items-center gap-3 text-lg font-black text-ink">
-              <span className="icon-chip-sm">
-                <Plus size={20} aria-hidden="true" />
-              </span>
-              {editingId ? t(language, "editIncome") : t(language, "addIncome")}
-            </span>
-            {showForm ? <ChevronUp className="text-brand-700" size={20} aria-hidden="true" /> : <ChevronDown className="text-brand-700" size={20} aria-hidden="true" />}
-          </button>
-
-          {showForm ? (
-            <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
+        <AppActionPanel
+          icon={Plus}
+          title={editingId ? t(language, "editIncome") : t(language, "addIncome")}
+          subtitle={t(language, "noIncomeHelper")}
+          expanded={showForm}
+          onToggle={() => setShowForm((value) => !value)}
+        >
+            <form className="space-y-4" onSubmit={handleSubmit}>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-2">
@@ -538,17 +507,15 @@ export default function IncomePage() {
             </Link>
           </div>
             </form>
-          ) : null}
-        </section>
+        </AppActionPanel>
 
         <section className="space-y-3">
-          <div className="card flex gap-2 overflow-x-auto p-3">
+          <AppFilterBar>
+            <div className="flex gap-2 overflow-x-auto pb-1">
             {(["all", "actual", "confirmed", "extra_gig"] as IncomeFilter[]).map((value) => (
               <button
                 key={value}
-                className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                    filter === value ? "border border-brand-200 bg-brand-50 text-brand-700 shadow-glow" : "border border-line bg-neutral-50 text-neutral-600 hover:text-ink"
-                  }`}
+                className={`filter-pill ${filter === value ? "filter-pill-active" : ""}`}
                 type="button"
                 onClick={() => setFilter(value)}
               >
@@ -561,7 +528,8 @@ export default function IncomePage() {
                       : t(language, "extraIncomeFilter")}
               </button>
             ))}
-          </div>
+            </div>
+          </AppFilterBar>
           {loading ? (
             <div className="card p-5 text-sm text-neutral-600">{t(language, "loadingIncome")}</div>
           ) : filteredEntries.length === 0 ? (
@@ -576,7 +544,7 @@ export default function IncomePage() {
               const expanded = expandedEntries.includes(entry.id);
 
               return (
-              <article key={entry.id} className="card p-4 transition hover:-translate-y-0.5">
+              <AppListCard key={entry.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
                     <span className={`icon-chip ${incomeTypeBadgeClass(entry.income_entry_type)}`}>
@@ -667,7 +635,7 @@ export default function IncomePage() {
                     {t(language, "delete")}
                   </button>
                 </div>
-              </article>
+              </AppListCard>
               );
             })
           )}

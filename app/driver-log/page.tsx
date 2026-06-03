@@ -26,6 +26,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { AppActionPanel, AppMetricCard, AppSectionCard } from "@/components/app-ui";
 import { PageHeader } from "@/components/page-header";
 import { TimePicker12Hour } from "@/components/TimePicker12Hour";
 import { weeklySettlementDays, workLogSourceOptionsByType, workLogTypes } from "@/lib/constants";
@@ -403,18 +404,23 @@ export default function DriverLogPage() {
     <>
       <PageHeader
         eyebrow={t(language, "driverLog")}
-        title={t(language, "driverLog")}
+        title={t(language, "weeklyWorkSummary")}
         subtitle={t(language, "driverLogSubtitle")}
         showBackToDashboard
         backToDashboardLabel={t(language, "backToDashboard")}
-      />
+      >
+        <button className="btn-primary" type="button" onClick={() => setShowForm(true)}>
+          <Plus size={18} aria-hidden="true" />
+          {t(language, "addDailyLog")}
+        </button>
+      </PageHeader>
 
       {message ? <p className="mb-4 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">{message}</p> : null}
       {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
       {loading ? <div className="card mb-4 p-4 text-sm text-neutral-600">{t(language, "loading")}</div> : null}
 
       <div className="space-y-5">
-        <section className="card p-5">
+        <AppSectionCard icon={CalendarDays} title={t(language, "weeklySettlementDay")} subtitle={t(language, "weeklySettlementProMessage")}>
           <label className="block space-y-2">
             <span className="field-label">{t(language, "weeklySettlementDay")}</span>
             <select
@@ -438,18 +444,9 @@ export default function DriverLogPage() {
               </span>
             ) : null}
           </label>
-        </section>
+        </AppSectionCard>
 
-        <section className="card p-5">
-          <div className="mb-4 flex items-start gap-3">
-            <span className="icon-chip-sm">
-              <ClipboardList size={20} aria-hidden="true" />
-            </span>
-            <div>
-            <h2 className="text-lg font-black text-ink">{t(language, "exportDriverLogs")}</h2>
-            <p className="mt-1 text-sm font-medium text-neutral-600">{t(language, "driverLogSubtitle")}</p>
-            </div>
-          </div>
+        <AppSectionCard icon={ClipboardList} title={t(language, "exportDriverLogs")} subtitle={t(language, "driverLogSubtitle")}>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-2">
               <span className="field-label">{t(language, "startDate")}</span>
@@ -482,7 +479,7 @@ export default function DriverLogPage() {
               {t(language, "exportGoogleSheets")}
             </button>
           </div>
-        </section>
+        </AppSectionCard>
 
         <WeeklySummaryCard
           title={t(language, "currentWeekSummary")}
@@ -531,23 +528,16 @@ export default function DriverLogPage() {
           />
         ) : null}
 
-        <section className="card p-5">
-          <button
-            className="flex w-full items-center justify-between gap-3 text-left"
-            type="button"
-            onClick={() => setShowForm((value) => !value)}
-          >
-            <span className="flex items-center gap-3 text-lg font-black text-ink">
-              <span className="icon-chip-sm">
-                <Plus size={20} aria-hidden="true" />
-              </span>
-              {editingId ? t(language, "editDailyLog") : t(language, "addDailyLog")}
-            </span>
-            {showForm ? <ChevronUp className="text-brand-700" size={20} aria-hidden="true" /> : <ChevronDown className="text-brand-700" size={20} aria-hidden="true" />}
-          </button>
-
-          {showForm ? (
-            <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
+        <AppActionPanel
+          icon={Plus}
+          title={editingId ? t(language, "editDailyLog") : t(language, "addDailyLog")}
+          subtitle={t(language, "noDailyRecordsHelper")}
+          expanded={showForm}
+          onToggle={() => setShowForm((value) => !value)}
+        >
+            <form className="space-y-5" onSubmit={handleSubmit}>
+              <div className="rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
+                <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "dayAndWorkType")}</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-2">
                   <span className="field-label">{t(language, "date")}</span>
@@ -597,7 +587,10 @@ export default function DriverLogPage() {
                   ))}
                 </select>
               </label>
+              </div>
 
+              <div className="rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
+                <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "scheduleSection")}</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <TimePicker12Hour
                   label={t(language, "startTime")}
@@ -610,7 +603,10 @@ export default function DriverLogPage() {
                   onChange={(value) => setForm({ ...form, end_time: value })}
                 />
               </div>
+              </div>
 
+              <div className="rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
+                <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "earningsAndExpenses")}</p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block space-y-2">
                   <span className="field-label">{t(language, "milesDriven")}</span>
@@ -641,6 +637,7 @@ export default function DriverLogPage() {
                 <span className="field-label">{t(language, "extraExpenses")}</span>
                 <input className="field" inputMode="decimal" value={form.extra_expenses} onChange={(event) => setForm({ ...form, extra_expenses: event.target.value })} />
               </label>
+              </div>
 
               {showStopsField ? (
                 <label className="block space-y-2">
@@ -649,7 +646,7 @@ export default function DriverLogPage() {
                 </label>
               ) : null}
 
-              <div className="rounded-lg border border-line bg-neutral-50 p-3">
+              <div className="rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
                 <p className="text-sm font-semibold text-ink">{t(language, "tripMath")}</p>
                 <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                   <Metric label={t(language, "hoursWorkedCalculated")} value={formatDurationFromDecimalHours(preview.hoursWorked)} />
@@ -701,8 +698,7 @@ export default function DriverLogPage() {
                 </Link>
               </div>
             </form>
-          ) : null}
-        </section>
+        </AppActionPanel>
       </div>
     </>
   );
@@ -882,13 +878,5 @@ function Metric({
   value: string;
   icon?: LucideIcon;
 }) {
-  return (
-    <p className="metric-card p-3">
-      <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide text-neutral-500">
-        {Icon ? <Icon size={16} aria-hidden="true" /> : null}
-        {label}
-      </span>
-      <span className="mt-1 block text-base font-black text-ink">{value}</span>
-    </p>
-  );
+  return <AppMetricCard compact icon={Icon} label={label} value={value} />;
 }
