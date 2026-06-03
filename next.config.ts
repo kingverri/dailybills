@@ -29,6 +29,8 @@ const nextConfig: NextConfig = {
       "/pricing/:path*",
       "/login",
       "/signup",
+      "/manifest.json",
+      "/sw.js",
       "/api/:path*"
     ].map((source) => ({
       source,
