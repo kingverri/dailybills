@@ -41,6 +41,7 @@ const landingCopy = {
     navPricing: "Pricing",
     login: "Log in",
     startFree: "Start free",
+    swipeHint: "Swipe to see more",
     plannerLabel: "Cash-flow planner",
     createAccount: "Create account",
     seeHow: "See how it works",
@@ -150,6 +151,7 @@ const landingCopy = {
     navPricing: "Preços",
     login: "Entrar",
     startFree: "Começar grátis",
+    swipeHint: "Arraste para ver mais",
     plannerLabel: "Planejador de fluxo",
     createAccount: "Criar conta",
     seeHow: "Ver como funciona",
@@ -259,6 +261,7 @@ const landingCopy = {
     navPricing: "Precios",
     login: "Iniciar sesión",
     startFree: "Empezar gratis",
+    swipeHint: "Desliza para ver más",
     plannerLabel: "Planificador de flujo",
     createAccount: "Crear cuenta",
     seeHow: "Ver cómo funciona",
@@ -545,19 +548,22 @@ export default function HomePage() {
       <section className="px-4 py-12 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <SectionIntro title={c.whoTitle} subtitle={c.whoSubtitle} />
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {c.audiences.map(([title, body], index) => {
-              const Icon = audienceIcons[index];
-              return (
-                <article key={title} className="group rounded-[1.75rem] border border-white/80 bg-white/82 p-5 shadow-xl shadow-emerald-950/5 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10">
-                  <span className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${accentClasses[index]} text-white shadow-lg transition group-hover:scale-105`}>
-                    <Icon size={28} aria-hidden="true" />
-                  </span>
-                  <h3 className="mt-5 text-lg font-black text-slate-950">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
-                </article>
-              );
-            })}
+          <p className="mt-5 text-xs font-black uppercase tracking-[0.2em] text-emerald-700 lg:hidden">{c.swipeHint}</p>
+          <div className="landing-carousel-wrap mt-5 lg:mt-8">
+            <div className="landing-carousel flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 lg:grid lg:snap-none lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+              {c.audiences.map(([title, body], index) => {
+                const Icon = audienceIcons[index];
+                return (
+                  <article key={title} className="group w-[82vw] shrink-0 snap-start rounded-[1.75rem] border border-white/80 bg-white/82 p-5 shadow-xl shadow-emerald-950/5 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 sm:w-[62vw] md:w-[46vw] lg:w-auto">
+                    <span className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${accentClasses[index]} text-white shadow-lg transition group-hover:scale-105`}>
+                      <Icon size={28} aria-hidden="true" />
+                    </span>
+                    <h3 className="mt-5 text-lg font-black text-slate-950">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
@@ -565,11 +571,23 @@ export default function HomePage() {
       <section id="features" className="px-4 py-12 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <SectionIntro title={c.featuresTitle} subtitle={c.featuresSubtitle} />
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {c.features.map(([title, body], index) => {
-              const Icon = featureIcons[index];
-              return <FeatureCard key={title} icon={Icon} title={title} body={body} accent={accentClasses[index]} />;
-            })}
+          <p className="mt-5 text-xs font-black uppercase tracking-[0.2em] text-emerald-700 lg:hidden">{c.swipeHint}</p>
+          <div className="landing-carousel-wrap mt-5 lg:mt-8">
+            <div className="landing-carousel flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 lg:grid lg:snap-none lg:grid-cols-3 lg:overflow-visible lg:pb-0">
+              {c.features.map(([title, body], index) => {
+                const Icon = featureIcons[index];
+                return (
+                  <FeatureCard
+                    key={title}
+                    icon={Icon}
+                    title={title}
+                    body={body}
+                    accent={accentClasses[index]}
+                    className="w-[86vw] shrink-0 snap-start sm:w-[64vw] md:w-[48vw] lg:w-auto"
+                  />
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
@@ -577,23 +595,26 @@ export default function HomePage() {
       <section id="how" className="px-4 py-12 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <SectionIntro title={c.howTitle} />
-          <div className="relative mt-8 grid gap-4 lg:grid-cols-4">
-            <div className="pointer-events-none absolute left-8 right-8 top-12 hidden h-px bg-gradient-to-r from-emerald-300 via-cyan-300 to-violet-300 lg:block" />
-            {c.steps.map(([title, body], index) => {
-              const Icon = stepIcons[index];
-              return (
-                <article key={title} className="relative rounded-[1.75rem] border border-white/80 bg-white/86 p-6 shadow-xl shadow-emerald-950/5">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${accentClasses[index]} text-white shadow-lg`}>
-                      <Icon size={27} aria-hidden="true" />
-                    </span>
-                    <span className="text-5xl font-black leading-none text-slate-100">0{index + 1}</span>
-                  </div>
-                  <h3 className="mt-5 text-lg font-black text-slate-950">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
-                </article>
-              );
-            })}
+          <p className="mt-5 text-xs font-black uppercase tracking-[0.2em] text-emerald-700 lg:hidden">{c.swipeHint}</p>
+          <div className="landing-carousel-wrap mt-5 lg:mt-8">
+            <div className="landing-carousel relative flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 lg:grid lg:snap-none lg:grid-cols-4 lg:overflow-visible lg:pb-0">
+              <div className="pointer-events-none absolute left-8 right-8 top-12 hidden h-px bg-gradient-to-r from-emerald-300 via-cyan-300 to-violet-300 lg:block" />
+              {c.steps.map(([title, body], index) => {
+                const Icon = stepIcons[index];
+                return (
+                  <article key={title} className="relative w-[86vw] shrink-0 snap-start rounded-[1.75rem] border border-white/80 bg-white/86 p-6 shadow-xl shadow-emerald-950/5 sm:w-[64vw] md:w-[48vw] lg:w-auto">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${accentClasses[index]} text-white shadow-lg`}>
+                        <Icon size={27} aria-hidden="true" />
+                      </span>
+                      <span className="text-5xl font-black leading-none text-slate-100">0{index + 1}</span>
+                    </div>
+                    <h3 className="mt-5 text-lg font-black text-slate-950">{title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
@@ -717,15 +738,17 @@ function FeatureCard({
   icon: Icon,
   title,
   body,
-  accent
+  accent,
+  className = ""
 }: {
   icon: LucideIcon;
   title: string;
   body: string;
   accent: string;
+  className?: string;
 }) {
   return (
-    <article className="group overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/86 shadow-xl shadow-emerald-950/5 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10">
+    <article className={`group overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/86 shadow-xl shadow-emerald-950/5 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 ${className}`}>
       <div className={`h-1.5 bg-gradient-to-r ${accent}`} />
       <div className="p-6">
         <span className={`flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br ${accent} text-white shadow-lg transition group-hover:scale-105`}>

@@ -332,6 +332,37 @@ textarea {
     @apply border-brand-200 bg-brand-50 text-brand-700 shadow-glow;
   }
 
+  .landing-carousel {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    scroll-padding-left: 0.25rem;
+  }
+
+  .landing-carousel::-webkit-scrollbar {
+    display: none;
+  }
+
+  .landing-carousel-wrap {
+    position: relative;
+  }
+
+  .landing-carousel-wrap::after {
+    content: "";
+    position: absolute;
+    bottom: 1rem;
+    right: -0.25rem;
+    top: 0;
+    width: 3.5rem;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(238, 243, 236, 0), #eef3ec 82%);
+  }
+
+  @media (min-width: 1024px) {
+    .landing-carousel-wrap::after {
+      display: none;
+    }
+  }
+
   .icon-chip {
     background: var(--primary-gradient);
     @apply inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-200 text-slate-950 shadow-glow;

@@ -28,9 +28,14 @@ import { PageHeader } from "@/components/page-header";
 import { useAuth } from "@/components/auth-provider";
 import {
   calculateCashFlowProjectionForPeriod,
+  calculateProjectedBalanceAfterBills,
+  calculateRiskLevelForPeriod,
+  calculateShortfallForPeriod,
   calculateMonthlySummary,
   getCustomProjectionRange,
   getDefaultMonthlyProjectionRange,
+  getOverdueBills,
+  type BillOccurrence,
   type ProjectionPeriod
 } from "@/lib/financeCalculations";
 import { formatCurrency, formatDate, toDateInputValue } from "@/lib/format";
@@ -53,6 +58,7 @@ export default function DashboardPage() {
     toDateInputValue(getDefaultMonthlyProjectionRange(new Date()).end)
   );
   const [showProjectionDetails, setShowProjectionDetails] = useState(false);
+  const [showOverdueDetails, setShowOverdueDetails] = useState(false);
   const [showFullMonthlySummary, setShowFullMonthlySummary] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -117,6 +123,40 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  async function markOccurrencePaid(bill: BillOccurrence) {
+    if (!user) {
+      setError(t(language, "loginAgain"));
+      return;
+    }
+
+    const supabase = getSupabaseClient();
+    const payload = {
+      user_id: user.id,
+      bill_id: bill.id,
+      occurrence_date: bill.occurrenceDate,
+      status: "paid" as const,
+      paid_at: new Date().toISOString()
+    };
+    const { data, error: updateError } = await supabase
+      .from("bill_occurrences")
+      .upsert(payload, { onConflict: "user_id,bill_id,occurrence_date" })
+      .select()
+      .single();
+
+    if (updateError) {
+      setError(t(language, "couldNotUpdateBillStatus"));
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const nextOccurrence = data ?? ({ ...payload, id: "", created_at: now, updated_at: now } as BillOccurrenceStatus);
+    setBillOccurrenceStatuses((items) => {
+      const key = `${bill.id}:${bill.occurrenceDate}`;
+      const withoutCurrent = items.filter((item) => `${item.bill_id}:${item.occurrence_date}` !== key);
+      return [...withoutCurrent, nextOccurrence];
+    });
+  }
+
   const dashboard = useMemo(() => {
     const cashFlow = calculateCashFlowProjectionForPeriod({
       currentBalance,
@@ -128,19 +168,40 @@ export default function DashboardPage() {
       asOf
     });
     const summary = calculateMonthlySummary(entries, bills, paySchedules, currentBalance, asOf, billOccurrenceStatuses);
-    const includedBillsTotal = cashFlow.bills.reduce((sum, bill) => sum + Number(bill.amount ?? 0), 0);
+    const todayValue = toDateInputValue(asOf);
+    const overdueBills = getOverdueBills(bills, billOccurrenceStatuses, asOf);
+    const upcomingBills = cashFlow.bills.filter((bill) => bill.occurrenceDate >= todayValue);
+    const overdueTotal = overdueBills.reduce((sum, bill) => sum + Number(bill.amount ?? 0), 0);
+    const upcomingBillsTotal = upcomingBills.reduce((sum, bill) => sum + Number(bill.amount ?? 0), 0);
+    const includedBillsTotal = overdueTotal + upcomingBillsTotal;
+    const projectedBalanceAfterBills = calculateProjectedBalanceAfterBills(cashFlow.projectedCash, includedBillsTotal);
+    const shortfall = calculateShortfallForPeriod(cashFlow.projectedCash, includedBillsTotal);
+    const adjustedCashFlow = {
+      ...cashFlow,
+      bills: upcomingBills,
+      requiredBills: includedBillsTotal,
+      projectedBalanceAfterBills,
+      safeToSpendToday: Math.max(0, projectedBalanceAfterBills),
+      shortfall,
+      riskLevel: calculateRiskLevelForPeriod(projectedBalanceAfterBills)
+    };
     const billProgress =
       includedBillsTotal > 0
-        ? Math.min(100, (cashFlow.projectedCash / Math.max(1, includedBillsTotal)) * 100)
+        ? Math.min(100, (adjustedCashFlow.projectedCash / Math.max(1, includedBillsTotal)) * 100)
         : 100;
 
     return {
-      cashFlow,
-      nextBill: cashFlow.bills[0],
+      cashFlow: adjustedCashFlow,
+      nextBill: upcomingBills[0],
       includedBillsTotal,
+      overdueBills,
+      overdueTotal,
+      overdueCount: overdueBills.length,
+      oldestOverdueBill: overdueBills[0],
+      upcomingBillsTotal,
       billProgress,
       summary,
-      includedBills: cashFlow.bills
+      includedBills: upcomingBills
     };
   }, [asOf, billOccurrenceStatuses, bills, currentBalance, entries, paySchedules, projectionRange]);
 
@@ -184,7 +245,9 @@ export default function DashboardPage() {
         endDate: periodEndDate
       })
     : t(language, "periodCoveredHeadline");
-  const recommendedAction = hasShortfall
+  const recommendedAction = dashboard.overdueTotal > 0
+    ? t(language, "prioritizeOverdueAction")
+    : hasShortfall
     ? t(language, "suggestedDailyAction", {
         dailyTarget: formatCurrency(suggestedDailyTarget, currency),
         endDate: periodEndDate
@@ -295,6 +358,13 @@ export default function DashboardPage() {
                     <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-200/90">{t(language, "periodStatus")}</p>
                     <h2 className="mt-2 max-w-3xl text-2xl font-black leading-tight text-white sm:text-4xl">{statusHeadline}</h2>
                     <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-300">{t(language, "projectionBasedOnIncomeBalanceBills")}</p>
+                    {dashboard.overdueTotal > 0 ? (
+                      <p className="mt-2 max-w-2xl text-sm font-black leading-6 text-rose-100">
+                        {t(language, "includesOverdueAmount", {
+                          amount: formatCurrency(dashboard.overdueTotal, currency)
+                        })}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <span className={clsx("inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-black backdrop-blur", statusCopy.className)}>
@@ -426,6 +496,19 @@ export default function DashboardPage() {
               ) : null}
             </div>
           </section>
+
+          {dashboard.overdueTotal > 0 ? (
+            <OverdueBillsCard
+              bills={dashboard.overdueBills}
+              currency={currency}
+              language={language}
+              oldestBill={dashboard.oldestOverdueBill}
+              showDetails={showOverdueDetails}
+              total={dashboard.overdueTotal}
+              onToggleDetails={() => setShowOverdueDetails((value) => !value)}
+              onMarkPaid={markOccurrencePaid}
+            />
+          ) : null}
 
           <div className="grid gap-5 lg:grid-cols-2">
           <section className="card p-5 sm:p-6">
@@ -652,6 +735,113 @@ function SummaryItem({ label, value, icon: Icon, tone = "neutral" }: { label: st
       </div>
       <p className="mt-3 text-xl font-black text-ink">{value}</p>
     </div>
+  );
+}
+
+function OverdueBillsCard({
+  bills,
+  currency,
+  language,
+  oldestBill,
+  showDetails,
+  total,
+  onToggleDetails,
+  onMarkPaid
+}: {
+  bills: BillOccurrence[];
+  currency: string;
+  language: string;
+  oldestBill?: BillOccurrence;
+  showDetails: boolean;
+  total: number;
+  onToggleDetails: () => void;
+  onMarkPaid: (bill: BillOccurrence) => void;
+}) {
+  return (
+    <section className="card border-red-200/80 p-5 shadow-red-950/10 sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-red-700 shadow-sm">
+            <AlertTriangle size={24} aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-red-700">{t(language, "overdueBills")}</p>
+            <h2 className="mt-1 text-2xl font-black text-ink">
+              {formatCurrency(total, currency)} {t(language, "overdueOpen")}
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-neutral-600">
+              {bills.length} {t(language, "overdueBillsCount")}
+            </p>
+            {oldestBill ? (
+              <p className="mt-1 text-sm font-medium text-neutral-600">
+                {t(language, "oldest")}: {oldestBill.name} - {formatDate(oldestBill.occurrenceDate, language)}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <button className="btn-secondary min-h-10" type="button" onClick={onToggleDetails}>
+          {showDetails ? t(language, "hideOverdue") : t(language, "viewOverdue")}
+          {showDetails ? <ChevronUp size={17} aria-hidden="true" /> : <ChevronDown size={17} aria-hidden="true" />}
+        </button>
+      </div>
+
+      <p className="mt-4 rounded-[1rem] border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+        {t(language, "includesOverdueUnpaid")}
+      </p>
+
+      {showDetails ? (
+        <div className="mt-4 space-y-3">
+          {bills.map((bill) => {
+            const daysOverdue = Math.abs(bill.daysRemaining);
+
+            return (
+              <article key={`${bill.id}-${bill.occurrenceDate}`} className="rounded-[1.1rem] border border-line bg-neutral-50 p-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-black text-ink">{bill.name}</p>
+                      <span className="badge badge-danger">{bill.category}</span>
+                    </div>
+                    <dl className="mt-3 grid gap-2 text-xs text-neutral-600 sm:grid-cols-2">
+                      <div>
+                        <dt className="font-medium uppercase tracking-wide text-neutral-500">{t(language, "originalDueDate")}</dt>
+                        <dd>{formatDate(bill.originalDueDate, language)}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-medium uppercase tracking-wide text-neutral-500">{t(language, "projectedOccurrenceDate")}</dt>
+                        <dd>{formatDate(bill.occurrenceDate, language)}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-medium uppercase tracking-wide text-neutral-500">{t(language, "status")}</dt>
+                        <dd>{t(language, "unpaid")}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-medium uppercase tracking-wide text-neutral-500">{t(language, "includedReason")}</dt>
+                        <dd>
+                          {bill.inclusionReason === "recurring_occurrence_in_projection_period"
+                            ? t(language, "billIncludedRecurring")
+                            : t(language, "billIncludedDueDate")}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="mt-2 text-sm font-black text-red-700">
+                      {daysOverdue} {t(language, "daysOverdue")}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    <p className="text-xl font-black text-ink">{formatCurrency(bill.amount, currency)}</p>
+                    <button className="btn-secondary min-h-10" type="button" onClick={() => onMarkPaid(bill)}>
+                      <CheckCircle2 size={16} aria-hidden="true" />
+                      {t(language, "markPaid")}
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
+    </section>
   );
 }
 

@@ -518,6 +518,38 @@ export function getBillsWithinProjectionPeriod(
   );
 }
 
+export function getOverdueBills(
+  bills: Bill[],
+  billOccurrenceStatuses: BillOccurrenceStatus[] = [],
+  asOf: DateLike = new Date()
+): BillOccurrence[] {
+  const today = startOfDay(asOf);
+  const yesterday = addDays(today, -1);
+  const overdueCandidates = bills
+    .map((bill) => startOfDay(bill.due_date))
+    .filter((date) => date < today);
+
+  if (overdueCandidates.length === 0) {
+    return [];
+  }
+
+  const oldestDueDate = new Date(Math.min(...overdueCandidates.map((date) => date.getTime())));
+
+  return mergeBillOccurrenceStatuses(
+    expandRecurringBillsWithinPeriod(bills, oldestDueDate, yesterday),
+    billOccurrenceStatuses
+  )
+    .filter((bill) => bill.status === "unpaid" && startOfDay(bill.occurrenceDate) < today)
+    .map((bill) => ({
+      ...bill,
+      daysRemaining: -daysBetween(startOfDay(bill.occurrenceDate), today)
+    }))
+    .sort((a, b) => {
+      const dateSort = a.occurrenceDate.localeCompare(b.occurrenceDate);
+      return dateSort === 0 ? a.name.localeCompare(b.name) : dateSort;
+    });
+}
+
 export function getIncomeWithinProjectionPeriod(
   incomeEntries: DailyIncomeEntry[] = [],
   projectionRange: ProjectionPeriodRange = getDefaultMonthlyProjectionRange()
