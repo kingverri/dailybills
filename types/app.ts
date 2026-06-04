@@ -41,6 +41,10 @@ export type Profile = {
   current_balance: number;
   income_type: IncomeType | null;
   work_type: WorkType | null;
+  preferred_work_types: WorkLogType[];
+  preferred_platforms: string[];
+  default_work_type: WorkLogType | null;
+  default_platform: string | null;
   language: Language;
   theme: AppTheme;
   plan: UserPlan;
@@ -155,6 +159,7 @@ export type DriverLog = {
   gas_price_per_gallon: number;
   extra_expenses: number;
   stops_completed: number;
+  hourly_rate: number;
   extra_expense_notes: string | null;
   notes: string | null;
   created_at: string;

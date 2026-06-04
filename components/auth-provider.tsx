@@ -4,7 +4,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { normalizeLanguage } from "@/lib/i18n";
 import { getSupabaseClient } from "@/lib/supabase";
-import type { AppTheme, Language, Profile, UserPlan, WeeklySettlementDay } from "@/types/app";
+import type { AppTheme, Language, Profile, UserPlan, WeeklySettlementDay, WorkLogType } from "@/types/app";
 
 type AuthContextValue = {
   user: User | null;
@@ -28,6 +28,10 @@ const defaultProfileValues = {
   theme: "dark" as AppTheme,
   plan: "free" as UserPlan,
   weekly_settlement_day: "friday" as WeeklySettlementDay,
+  preferred_work_types: ["driver"] as WorkLogType[],
+  preferred_platforms: [] as string[],
+  default_work_type: "driver" as const,
+  default_platform: null as string | null,
   onboarding_completed: false
 };
 
@@ -71,6 +75,28 @@ function normalizeSettlementDay(day?: string | null): WeeklySettlementDay {
   return "friday";
 }
 
+function normalizeWorkLogType(type?: string | null) {
+  if (
+    type === "driver" ||
+    type === "cleaner" ||
+    type === "restaurant_worker" ||
+    type === "server_waiter" ||
+    type === "warehouse" ||
+    type === "construction" ||
+    type === "landscaping" ||
+    type === "delivery_courier" ||
+    type === "other"
+  ) {
+    return type;
+  }
+
+  return "driver";
+}
+
+function normalizeStringArray(value?: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
 function buildProfileDefaults(currentUser: User) {
   return {
     user_id: currentUser.id,
@@ -101,6 +127,10 @@ function normalizeProfile(profile: Partial<Profile> & { user_id: string }, curre
     current_balance: Number(profile.current_balance ?? defaultProfileValues.current_balance),
     income_type: profile.income_type ?? null,
     work_type: profile.work_type ?? null,
+    preferred_work_types: normalizeStringArray(profile.preferred_work_types).map(normalizeWorkLogType),
+    preferred_platforms: normalizeStringArray(profile.preferred_platforms),
+    default_work_type: normalizeWorkLogType(profile.default_work_type),
+    default_platform: profile.default_platform ?? null,
     language: normalizeLanguage(profile.language) as Language,
     theme: normalizeTheme(profile.theme),
     plan: normalizePlan(profile.plan),

@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/components/auth-provider";
-import { currencies, daysOfWeek, incomeTypes, paymentScheduleTypes, workTypes } from "@/lib/constants";
-import { dayOfWeekLabel, scheduleTypeLabel, t } from "@/lib/i18n";
+import { currencies, daysOfWeek, incomeTypes, paymentScheduleTypes, workLogSourceOptionsByType, workLogTypes, workTypes } from "@/lib/constants";
+import { dayOfWeekLabel, scheduleTypeLabel, t, workLogTypeLabel } from "@/lib/i18n";
 import { getSupabaseClient } from "@/lib/supabase";
-import type { DayOfWeek, IncomeType, PaymentScheduleType, WorkType } from "@/types/app";
+import type { DayOfWeek, IncomeType, PaymentScheduleType, WorkLogType, WorkType } from "@/types/app";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -20,7 +20,14 @@ export default function OnboardingPage() {
   const [country, setCountry] = useState(profile?.country ?? "United States");
   const [state, setState] = useState(profile?.state ?? "");
   const [city, setCity] = useState(profile?.city ?? "");
-  const [workType, setWorkType] = useState<WorkType>(profile?.work_type ?? "DoorDash");
+  const [preferredWorkTypes, setPreferredWorkTypes] = useState<WorkLogType[]>(
+    profile?.preferred_work_types?.length ? profile.preferred_work_types : [profile?.default_work_type ?? "driver"]
+  );
+  const [defaultWorkType, setDefaultWorkType] = useState<WorkLogType>(profile?.default_work_type ?? "driver");
+  const [preferredPlatforms, setPreferredPlatforms] = useState<string[]>(
+    profile?.preferred_platforms?.length ? profile.preferred_platforms : [profile?.default_platform ?? profile?.work_type ?? "DoorDash"]
+  );
+  const [defaultPlatform, setDefaultPlatform] = useState(profile?.default_platform ?? profile?.work_type ?? "DoorDash");
   const [scheduleType, setScheduleType] = useState<PaymentScheduleType>("weekly");
   const [dayOfWeek, setDayOfWeek] = useState<DayOfWeek>("Friday");
   const [estimatedAmount, setEstimatedAmount] = useState("");
@@ -31,6 +38,37 @@ export default function OnboardingPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const language = profile?.language ?? "en";
+  const selectedWorkTypes = preferredWorkTypes.length > 0 ? preferredWorkTypes : [defaultWorkType];
+  const platformOptions: string[] = Array.from(
+    new Set([...selectedWorkTypes.flatMap((type) => [...workLogSourceOptionsByType[type]]), ...preferredPlatforms])
+  );
+
+  function legacyWorkTypeFromPlatform(platform: string): WorkType {
+    return workTypes.includes(platform as WorkType) ? (platform as WorkType) : "Other";
+  }
+
+  function togglePreferredWorkType(type: WorkLogType) {
+    const exists = preferredWorkTypes.includes(type);
+    const nextTypes = exists ? preferredWorkTypes.filter((item) => item !== type) : [...preferredWorkTypes, type];
+    const safeTypes = nextTypes.length > 0 ? nextTypes : [type];
+    const nextDefaultWorkType = safeTypes.includes(defaultWorkType) ? defaultWorkType : safeTypes[0];
+    const nextPlatformOptions: string[] = Array.from(new Set(safeTypes.flatMap((item) => [...workLogSourceOptionsByType[item]])));
+    const nextDefaultPlatform = nextPlatformOptions.includes(defaultPlatform) ? defaultPlatform : nextPlatformOptions[0] ?? "Other";
+
+    setPreferredWorkTypes(safeTypes);
+    setDefaultWorkType(nextDefaultWorkType);
+    setDefaultPlatform(nextDefaultPlatform);
+    setPreferredPlatforms(preferredPlatforms.filter((platform) => nextPlatformOptions.includes(platform)));
+  }
+
+  function togglePreferredPlatform(platform: string) {
+    const exists = preferredPlatforms.includes(platform);
+    const nextPlatforms = exists ? preferredPlatforms.filter((item) => item !== platform) : [...preferredPlatforms, platform];
+    const safePlatforms = nextPlatforms.length > 0 ? nextPlatforms : [platform];
+
+    setPreferredPlatforms(safePlatforms);
+    setDefaultPlatform(safePlatforms.includes(defaultPlatform) ? defaultPlatform : safePlatforms[0]);
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -74,7 +112,11 @@ export default function OnboardingPage() {
           country: country.trim() || "United States",
           state: state.trim() || null,
           city: city.trim() || null,
-          work_type: workType,
+          work_type: legacyWorkTypeFromPlatform(defaultPlatform),
+          preferred_work_types: selectedWorkTypes,
+          preferred_platforms: preferredPlatforms,
+          default_work_type: defaultWorkType,
+          default_platform: defaultPlatform,
           language,
           onboarding_completed: true
         },
@@ -151,12 +193,67 @@ export default function OnboardingPage() {
                 ))}
               </select>
             </label>
+          </div>
+
+          <div className="space-y-3 rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
+            <p className="text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "workSetup")}</p>
+            <p className="field-label">{t(language, "mainWorkType")}</p>
+            <div className="flex flex-wrap gap-2">
+              {workLogTypes.map((type) => (
+                <button
+                  key={type}
+                  className={preferredWorkTypes.includes(type) ? "btn-primary min-h-10 px-3" : "btn-secondary min-h-10 px-3"}
+                  type="button"
+                  onClick={() => togglePreferredWorkType(type)}
+                >
+                  {workLogTypeLabel(language, type)}
+                </button>
+              ))}
+            </div>
 
             <label className="block space-y-2">
-              <span className="field-label">{t(language, "mainWorkType")}</span>
-              <select className="field" value={workType} onChange={(event) => setWorkType(event.target.value as WorkType)}>
-                {workTypes.map((type) => (
-                  <option key={type}>{type}</option>
+              <span className="field-label">{t(language, "mainWork")}</span>
+              <select className="field" value={defaultWorkType} onChange={(event) => setDefaultWorkType(event.target.value as WorkLogType)}>
+                {selectedWorkTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {workLogTypeLabel(language, type)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="space-y-2">
+              <p className="field-label">{t(language, "jobsPlatforms")}</p>
+              <div className="flex flex-wrap gap-2">
+                {platformOptions.map((platform) => (
+                  <button
+                    key={platform}
+                    className={preferredPlatforms.includes(platform) ? "btn-primary min-h-10 px-3" : "btn-secondary min-h-10 px-3"}
+                    type="button"
+                    onClick={() => togglePreferredPlatform(platform)}
+                  >
+                    {platform}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="block space-y-2">
+              <span className="field-label">{t(language, "defaultPlatform")}</span>
+              <select
+                className="field"
+                value={defaultPlatform}
+                onChange={(event) => {
+                  setDefaultPlatform(event.target.value);
+                  if (!preferredPlatforms.includes(event.target.value)) {
+                    setPreferredPlatforms([...preferredPlatforms, event.target.value]);
+                  }
+                }}
+              >
+                {platformOptions.map((platform) => (
+                  <option key={platform} value={platform}>
+                    {platform}
+                  </option>
                 ))}
               </select>
             </label>

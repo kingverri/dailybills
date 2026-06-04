@@ -19,12 +19,20 @@ import {
   ShieldAlert,
   ShieldCheck,
   Target,
-  Wallet
+  Wallet,
+  X
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
+import {
+  WorkRecordForm,
+  buildWorkRecordPayload,
+  createWorkRecordForm,
+  validateWorkRecordForm,
+  type WorkRecordFormValues
+} from "@/components/work-record-form";
 import { useAuth } from "@/components/auth-provider";
 import {
   calculateCashFlowProjectionForPeriod,
@@ -40,9 +48,9 @@ import {
 } from "@/lib/financeCalculations";
 import { formatCurrency, formatDate, toDateInputValue } from "@/lib/format";
 import { projectionPeriodLabel, t } from "@/lib/i18n";
-import { canUseCustomProjection, getCurrentPlan } from "@/lib/planLimits";
+import { canAddDriverLog, canUseCustomProjection, getCurrentMonthDriverLogCount, getCurrentPlan } from "@/lib/planLimits";
 import { getSupabaseClient } from "@/lib/supabase";
-import type { Bill, BillOccurrenceStatus, DailyIncomeEntry, PaySchedule, Vehicle } from "@/types/app";
+import type { Bill, BillOccurrenceStatus, DailyIncomeEntry, DriverLog, PaySchedule, Vehicle } from "@/types/app";
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
@@ -50,7 +58,12 @@ export default function DashboardPage() {
   const [billOccurrenceStatuses, setBillOccurrenceStatuses] = useState<BillOccurrenceStatus[]>([]);
   const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
   const [entries, setEntries] = useState<DailyIncomeEntry[]>([]);
+  const [driverLogs, setDriverLogs] = useState<DriverLog[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [quickLogForm, setQuickLogForm] = useState<WorkRecordFormValues>(() => createWorkRecordForm(profile));
+  const [showQuickLogModal, setShowQuickLogModal] = useState(false);
+  const [savingQuickLog, setSavingQuickLog] = useState(false);
+  const [quickLogMessage, setQuickLogMessage] = useState("");
   const [asOf] = useState(() => new Date());
   const [projectionPeriod, setProjectionPeriod] = useState<ProjectionPeriod>("this_month");
   const [customStartDate, setCustomStartDate] = useState(() => toDateInputValue(new Date()));
@@ -68,6 +81,8 @@ export default function DashboardPage() {
   const language = profile?.language ?? "en";
   const currentPlan = getCurrentPlan(profile);
   const canUseCustomPeriod = canUseCustomProjection(currentPlan);
+  const monthlyDriverLogCount = useMemo(() => getCurrentMonthDriverLogCount(driverLogs), [driverLogs]);
+  const canCreateDriverLog = canAddDriverLog(currentPlan, monthlyDriverLogCount);
   const currentBalance = Number(profile?.current_balance ?? 0);
   const projectionRange = useMemo(
     () =>
@@ -95,16 +110,17 @@ export default function DashboardPage() {
 
     setLoading(true);
     const supabase = getSupabaseClient();
-    const [billResult, occurrenceResult, scheduleResult, entryResult, vehicleResult] = await Promise.all([
+    const [billResult, occurrenceResult, scheduleResult, entryResult, driverLogResult, vehicleResult] = await Promise.all([
       supabase.from("bills").select("*").eq("user_id", user.id),
       supabase.from("bill_occurrences").select("*").eq("user_id", user.id),
       supabase.from("pay_schedules").select("*").eq("user_id", user.id),
       supabase.from("daily_income_entries").select("*").eq("user_id", user.id),
+      supabase.from("driver_logs").select("*").eq("user_id", user.id).order("date", { ascending: false }),
       supabase.from("vehicles").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
     ]);
 
     const firstError =
-      billResult.error ?? occurrenceResult.error ?? scheduleResult.error ?? entryResult.error ?? vehicleResult.error;
+      billResult.error ?? occurrenceResult.error ?? scheduleResult.error ?? entryResult.error ?? driverLogResult.error ?? vehicleResult.error;
 
     if (firstError) {
       setError(firstError.message);
@@ -113,6 +129,7 @@ export default function DashboardPage() {
       setBillOccurrenceStatuses(occurrenceResult.data ?? []);
       setPaySchedules(scheduleResult.data ?? []);
       setEntries(entryResult.data ?? []);
+      setDriverLogs(driverLogResult.data ?? []);
       setVehicles(vehicleResult.data ?? []);
     }
     setLoading(false);
@@ -122,6 +139,50 @@ export default function DashboardPage() {
     loadDashboard().catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!showQuickLogModal) {
+      setQuickLogForm(createWorkRecordForm(profile));
+    }
+  }, [profile, showQuickLogModal]);
+
+  async function saveQuickWorkLog(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setQuickLogMessage("");
+
+    if (!user) {
+      setError(t(language, "loginAgain"));
+      return;
+    }
+
+    if (!canCreateDriverLog) {
+      setError(t(language, "freeDriverLogLimitMessage"));
+      return;
+    }
+
+    if (!validateWorkRecordForm(quickLogForm)) {
+      setError(t(language, "logRequiredError"));
+      return;
+    }
+
+    setSavingQuickLog(true);
+    const supabase = getSupabaseClient();
+    const { error: saveError } = await supabase
+      .from("driver_logs")
+      .insert({ ...buildWorkRecordPayload(quickLogForm), user_id: user.id });
+    setSavingQuickLog(false);
+
+    if (saveError) {
+      setError(saveError.message);
+      return;
+    }
+
+    setQuickLogMessage(t(language, "logSaved"));
+    setShowQuickLogModal(false);
+    setQuickLogForm(createWorkRecordForm(profile));
+    await loadDashboard();
+  }
 
   async function markOccurrencePaid(bill: BillOccurrence) {
     if (!user) {
@@ -262,7 +323,7 @@ export default function DashboardPage() {
         title={t(language, "todayName", { name: profile?.full_name?.split(" ")[0] ?? t(language, "driver") })}
         subtitle={t(language, "dashboardSubtitle")}
       >
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3 lg:flex lg:w-auto">
           <Link className="btn-secondary" href="/bills">
             <Plus size={18} aria-hidden="true" />
             {t(language, "addBill")}
@@ -271,9 +332,14 @@ export default function DashboardPage() {
             <Plus size={18} aria-hidden="true" />
             {t(language, "addIncome")}
           </Link>
+          <button className="btn-primary" type="button" onClick={() => setShowQuickLogModal(true)}>
+            <Plus size={18} aria-hidden="true" />
+            {t(language, "logWork")}
+          </button>
         </div>
       </PageHeader>
 
+      {quickLogMessage ? <p className="mb-4 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-700">{quickLogMessage}</p> : null}
       {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
 
       {loading ? (
@@ -659,6 +725,41 @@ export default function DashboardPage() {
           ) : null}
         </div>
       )}
+
+      {showQuickLogModal ? (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
+          <div className="mx-auto max-w-2xl rounded-[2rem] border border-line bg-surface p-4 shadow-2xl sm:p-6">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-700">{t(language, "driverLog")}</p>
+                <h2 className="mt-1 text-2xl font-black text-ink">{t(language, "logTodaysWork")}</h2>
+              </div>
+              <button className="btn-secondary min-h-10 px-3" type="button" onClick={() => setShowQuickLogModal(false)}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+            {!canCreateDriverLog ? (
+              <div className="mb-4 rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-brand-800">
+                <p>{t(language, "freeDriverLogLimitMessage")}</p>
+                <Link className="btn-primary mt-3" href="/pricing">
+                  {t(language, "upgrade")}
+                </Link>
+              </div>
+            ) : null}
+            <WorkRecordForm
+              currency={currency}
+              form={quickLogForm}
+              language={language}
+              profile={profile}
+              saving={savingQuickLog}
+              setForm={setQuickLogForm}
+              submitLabel={t(language, "saveLog")}
+              onCancel={() => setShowQuickLogModal(false)}
+              onSubmit={saveQuickWorkLog}
+            />
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

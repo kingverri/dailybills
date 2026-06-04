@@ -28,8 +28,15 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AppActionPanel, AppMetricCard, AppSectionCard } from "@/components/app-ui";
 import { PageHeader } from "@/components/page-header";
-import { TimePicker12Hour } from "@/components/TimePicker12Hour";
-import { weeklySettlementDays, workLogSourceOptionsByType, workLogTypes } from "@/lib/constants";
+import {
+  WorkRecordForm,
+  buildWorkRecordPayload,
+  createWorkRecordForm,
+  validateWorkRecordForm,
+  workRecordFromLog,
+  type WorkRecordFormValues
+} from "@/components/work-record-form";
+import { weeklySettlementDays } from "@/lib/constants";
 import {
   calculateDriverLogMetrics,
   calculateWeeklyDriverSummaryForRange,
@@ -60,49 +67,11 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import type { DriverLog, PaySchedule, WeeklySettlementDay, WorkLogType } from "@/types/app";
 
-type DriverLogForm = {
-  date: string;
-  work_type: WorkLogType;
-  platform: string;
-  start_time: string;
-  end_time: string;
-  miles_driven: string;
-  gross_earnings: string;
-  tips_received: string;
-  gas_spent: string;
-  gas_price_per_gallon: string;
-  extra_expenses: string;
-  stops_completed: string;
-  extra_expense_notes: string;
-  notes: string;
-};
-
 type ExportFormat = "csv" | "xlsx" | "google";
-
-const initialForm: DriverLogForm = {
-  date: toDateInputValue(),
-  work_type: "driver",
-  platform: "DoorDash",
-  start_time: "",
-  end_time: "",
-  miles_driven: "",
-  gross_earnings: "",
-  tips_received: "",
-  gas_spent: "",
-  gas_price_per_gallon: "",
-  extra_expenses: "",
-  stops_completed: "",
-  extra_expense_notes: "",
-  notes: ""
-};
 
 function dayOfWeekToSettlementDay(day?: string | null): WeeklySettlementDay | null {
   const value = day?.toLowerCase();
   return weeklySettlementDays.find((item) => item === value) ?? null;
-}
-
-function timeForInput(time?: string | null) {
-  return time ? time.slice(0, 5) : "";
 }
 
 function workLogTypeIcon(type: WorkLogType | string | null | undefined) {
@@ -125,7 +94,7 @@ export default function DriverLogPage() {
   const { user, profile, refreshProfile } = useAuth();
   const [logs, setLogs] = useState<DriverLog[]>([]);
   const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
-  const [form, setForm] = useState<DriverLogForm>(initialForm);
+  const [form, setForm] = useState<WorkRecordFormValues>(() => createWorkRecordForm(profile));
   const [settlementDay, setSettlementDay] = useState<WeeklySettlementDay>("friday");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -148,34 +117,6 @@ export default function DriverLogPage() {
   const canCreateDriverLog = canAddDriverLog(currentPlan, monthlyDriverLogCount);
   const canChangeSettlementDay = canUseWeeklySettlement(currentPlan);
   const canViewWeeklyHistory = canUseWeeklyHistory(currentPlan);
-  const gross = Number(form.gross_earnings || 0);
-  const tipsReceived = Number(form.tips_received || 0);
-  const miles = Number(form.miles_driven || 0);
-  const gasSpent = Number(form.gas_spent || 0);
-  const gasPrice = Number(form.gas_price_per_gallon || 0);
-  const extraExpenses = Number(form.extra_expenses || 0);
-  const stopsCompleted = Number(form.stops_completed || 0);
-  const jobSourceOptions = useMemo(() => {
-    const options: string[] = [...workLogSourceOptionsByType[form.work_type]];
-    return form.platform && !options.includes(form.platform) ? [...options, form.platform] : options;
-  }, [form.platform, form.work_type]);
-  const showStopsField =
-    (form.work_type === "driver" || form.work_type === "delivery_courier") && form.platform === "OnTrac";
-  const preview = useMemo(
-    () =>
-      calculateDriverLogMetrics({
-        start_time: form.start_time || null,
-        end_time: form.end_time || null,
-        miles_driven: miles,
-        gross_earnings: gross,
-        tips_received: tipsReceived,
-        gas_spent: gasSpent,
-        gas_price_per_gallon: gasPrice,
-        extra_expenses: extraExpenses,
-        stops_completed: stopsCompleted
-      }),
-    [extraExpenses, form.end_time, form.start_time, gasPrice, gasSpent, gross, miles, stopsCompleted, tipsReceived]
-  );
   const currentWeekRange = useMemo(() => getWeekRangeBySettlementDay(new Date(), settlementDay), [settlementDay]);
   const previousWeekRange = useMemo(() => {
     const previousAnchor = new Date(currentWeekRange.start);
@@ -235,8 +176,14 @@ export default function DriverLogPage() {
     setSettlementDay(profile?.weekly_settlement_day ?? weeklyScheduleDay ?? "friday");
   }, [paySchedules, profile?.weekly_settlement_day]);
 
+  useEffect(() => {
+    if (!editingId) {
+      setForm(createWorkRecordForm(profile));
+    }
+  }, [editingId, profile]);
+
   function resetForm() {
-    setForm(initialForm);
+    setForm(createWorkRecordForm(profile));
     setEditingId(null);
     setError("");
   }
@@ -244,22 +191,7 @@ export default function DriverLogPage() {
   function editLog(log: DriverLog) {
     setEditingId(log.id);
     setShowForm(true);
-    setForm({
-      date: log.date,
-      work_type: log.work_type ?? "driver",
-      platform: log.platform,
-      start_time: timeForInput(log.start_time),
-      end_time: timeForInput(log.end_time),
-      miles_driven: String(log.miles_driven),
-      gross_earnings: String(log.gross_earnings),
-      tips_received: log.tips_received ? String(log.tips_received) : "",
-      gas_spent: String(log.gas_spent),
-      gas_price_per_gallon: String(log.gas_price_per_gallon),
-      extra_expenses: String(log.extra_expenses),
-      stops_completed: log.stops_completed ? String(log.stops_completed) : "",
-      extra_expense_notes: log.extra_expense_notes ?? "",
-      notes: log.notes ?? ""
-    });
+    setForm(workRecordFromLog(log));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -304,48 +236,14 @@ export default function DriverLogPage() {
       return;
     }
 
-    if (
-      !form.date ||
-      !form.platform ||
-      !form.start_time ||
-      !form.end_time ||
-      !Number.isFinite(miles) ||
-      miles < 0 ||
-      !Number.isFinite(gross) ||
-      gross < 0 ||
-      !Number.isFinite(tipsReceived) ||
-      tipsReceived < 0 ||
-      !Number.isFinite(gasSpent) ||
-      gasSpent < 0 ||
-      !Number.isFinite(gasPrice) ||
-      gasPrice < 0 ||
-      !Number.isFinite(extraExpenses) ||
-      extraExpenses < 0 ||
-      !Number.isFinite(stopsCompleted) ||
-      stopsCompleted < 0
-    ) {
+    if (!validateWorkRecordForm(form)) {
       setError(t(language, "logRequiredError"));
       return;
     }
 
     setSaving(true);
     const supabase = getSupabaseClient();
-    const payload = {
-      date: form.date,
-      work_type: form.work_type,
-      platform: form.platform,
-      start_time: form.start_time || null,
-      end_time: form.end_time || null,
-      miles_driven: miles,
-      gross_earnings: gross,
-      tips_received: tipsReceived,
-      gas_spent: gasSpent,
-      gas_price_per_gallon: gasPrice,
-      extra_expenses: extraExpenses,
-      stops_completed: showStopsField ? stopsCompleted : 0,
-      extra_expense_notes: form.extra_expense_notes.trim() || null,
-      notes: form.notes.trim() || null
-    };
+    const payload = buildWorkRecordPayload(form);
     const result = editingId
       ? await supabase.from("driver_logs").update(payload).eq("id", editingId)
       : await supabase.from("driver_logs").insert({ ...payload, user_id: user.id });
@@ -535,169 +433,31 @@ export default function DriverLogPage() {
           expanded={showForm}
           onToggle={() => setShowForm((value) => !value)}
         >
-            <form className="space-y-5" onSubmit={handleSubmit}>
-              <div className="rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
-                <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "dayAndWorkType")}</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-2">
-                  <span className="field-label">{t(language, "date")}</span>
-                  <input className="field" type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} />
-                </label>
-                <label className="block space-y-2">
-                  <span className="field-label">{t(language, "workType")}</span>
-                  <select
-                    className="field"
-                    value={form.work_type}
-                    onChange={(event) => {
-                      const nextWorkType = event.target.value as WorkLogType;
-                      setForm({
-                        ...form,
-                        work_type: nextWorkType,
-                        platform: workLogSourceOptionsByType[nextWorkType][0],
-                        stops_completed: ""
-                      });
-                    }}
-                  >
-                    {workLogTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {workLogTypeLabel(language, type)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label className="block space-y-2">
-                <span className="field-label">{t(language, "jobPlatform")}</span>
-                <select
-                  className="field"
-                  value={form.platform}
-                  onChange={(event) =>
-                    setForm({
-                      ...form,
-                      platform: event.target.value,
-                      stops_completed: event.target.value === "OnTrac" ? form.stops_completed : ""
-                    })
-                  }
-                >
-                  {jobSourceOptions.map((source) => (
-                    <option key={source} value={source}>
-                      {source}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              </div>
-
-              <div className="rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
-                <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "scheduleSection")}</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <TimePicker12Hour
-                  label={t(language, "startTime")}
-                  value={form.start_time}
-                  onChange={(value) => setForm({ ...form, start_time: value })}
-                />
-                <TimePicker12Hour
-                  label={t(language, "endTime")}
-                  value={form.end_time}
-                  onChange={(value) => setForm({ ...form, end_time: value })}
-                />
-              </div>
-              </div>
-
-              <div className="rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
-                <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "earningsAndExpenses")}</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-2">
-                  <span className="field-label">{t(language, "milesDriven")}</span>
-                  <input className="field" inputMode="decimal" value={form.miles_driven} onChange={(event) => setForm({ ...form, miles_driven: event.target.value })} />
-                </label>
-                <label className="block space-y-2">
-                  <span className="field-label">{t(language, "grossEarnings")}</span>
-                  <input className="field" inputMode="decimal" value={form.gross_earnings} onChange={(event) => setForm({ ...form, gross_earnings: event.target.value })} />
-                </label>
-                <label className="block space-y-2">
-                  <span className="field-label">{t(language, "tipsReceived")}</span>
-                  <input className="field" inputMode="decimal" value={form.tips_received} onChange={(event) => setForm({ ...form, tips_received: event.target.value })} />
-                </label>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block space-y-2">
-                  <span className="field-label">{t(language, "gasSpent")}</span>
-                  <input className="field" inputMode="decimal" value={form.gas_spent} onChange={(event) => setForm({ ...form, gas_spent: event.target.value })} />
-                </label>
-                <label className="block space-y-2">
-                  <span className="field-label">{t(language, "gasPricePerGallon")}</span>
-                  <input className="field" inputMode="decimal" value={form.gas_price_per_gallon} onChange={(event) => setForm({ ...form, gas_price_per_gallon: event.target.value })} />
-                </label>
-              </div>
-
-              <label className="block space-y-2">
-                <span className="field-label">{t(language, "extraExpenses")}</span>
-                <input className="field" inputMode="decimal" value={form.extra_expenses} onChange={(event) => setForm({ ...form, extra_expenses: event.target.value })} />
-              </label>
-              </div>
-
-              {showStopsField ? (
-                <label className="block space-y-2">
-                  <span className="field-label">{t(language, "stopsCompleted")}</span>
-                  <input className="field" inputMode="numeric" value={form.stops_completed} onChange={(event) => setForm({ ...form, stops_completed: event.target.value })} />
-                </label>
-              ) : null}
-
-              <div className="rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
-                <p className="text-sm font-semibold text-ink">{t(language, "tripMath")}</p>
-                <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                  <Metric label={t(language, "hoursWorkedCalculated")} value={formatDurationFromDecimalHours(preview.hoursWorked)} />
-                  <Metric label={t(language, "totalEarnings")} value={formatCurrency(preview.totalEarnings, currency)} />
-                  <Metric label={t(language, "netProfit")} value={formatCurrency(preview.netProfit, currency)} />
-                  <Metric label={t(language, "netPerHour")} value={formatHourlyRate(preview.netProfitPerHour, currency, language)} />
-                  {showStopsField && stopsCompleted > 0 ? (
-                    <>
-                      <Metric label={t(language, "grossPerStop")} value={formatCurrency(preview.grossPerStop, currency)} />
-                      <Metric label={t(language, "netPerStop")} value={formatCurrency(preview.netPerStop, currency)} />
-                    </>
-                  ) : (
-                    <Metric label={t(language, "gallonsBought")} value={preview.gallonsBought.toFixed(2)} />
-                  )}
-                </div>
-              </div>
-
-              <label className="block space-y-2">
-                <span className="field-label">{t(language, "extraExpenseNotes")}</span>
-                <textarea className="field min-h-20" value={form.extra_expense_notes} onChange={(event) => setForm({ ...form, extra_expense_notes: event.target.value })} />
-              </label>
-
-              <label className="block space-y-2">
-                <span className="field-label">{t(language, "generalNotes")}</span>
-                <textarea className="field min-h-24" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-              </label>
-
-              {!editingId && !canCreateDriverLog ? (
+          <WorkRecordForm
+            currency={currency}
+            form={form}
+            language={language}
+            profile={profile}
+            saving={saving}
+            setForm={setForm}
+            submitLabel={t(language, "saveLog")}
+            onCancel={editingId ? resetForm : undefined}
+            onSubmit={handleSubmit}
+            footer={
+              !editingId && !canCreateDriverLog ? (
                 <div className="rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-brand-800">
                   <p>{t(language, "freeDriverLogLimitMessage")}</p>
                   <Link className="btn-primary mt-3" href="/pricing">
                     {t(language, "upgrade")}
                   </Link>
                 </div>
-              ) : null}
-
-              <div className="flex flex-wrap gap-2">
-                <button className="btn-primary flex-1" type="submit" disabled={saving || (!editingId && !canCreateDriverLog)}>
-                  <Plus size={18} aria-hidden="true" />
-                  {saving ? t(language, "saving") : t(language, "saveLog")}
-                </button>
-                {editingId ? (
-                  <button className="btn-secondary" type="button" onClick={resetForm}>
-                    {t(language, "cancel")}
-                  </button>
-                ) : null}
-                <Link className="btn-secondary flex-1" href="/dashboard">
+              ) : (
+                <Link className="btn-secondary w-full" href="/dashboard">
                   {t(language, "backToDashboard")}
                 </Link>
-              </div>
-            </form>
+              )
+            }
+          />
         </AppActionPanel>
       </div>
     </>

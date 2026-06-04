@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Eye, EyeOff, LogIn } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, KeyRound, LogIn } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -16,8 +16,13 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
   const [error, setError] = useState("");
+  const [resetError, setResetError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [language, setLanguage] = useState<Language>("en");
 
   useEffect(() => {
@@ -59,6 +64,31 @@ export default function LoginPage() {
     router.replace("/dashboard");
   }
 
+  async function handlePasswordReset() {
+    setResetError("");
+    setResetMessage("");
+
+    if (!resetEmail) {
+      setResetError(t(language, "pleaseFillRequiredFields"));
+      return;
+    }
+
+    setResetLoading(true);
+    const supabase = getSupabaseClient();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin;
+    const { error: resetPasswordError } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${appUrl}/reset-password`
+    });
+    setResetLoading(false);
+
+    if (resetPasswordError) {
+      setResetError(resetPasswordError.message);
+      return;
+    }
+
+    setResetMessage(t(language, "resetEmailSent"));
+  }
+
   return (
     <AuthCard
       title="Welcome back"
@@ -95,6 +125,38 @@ export default function LoginPage() {
             </button>
           </div>
         </label>
+
+        <button
+          className="text-sm font-semibold text-brand-700 hover:text-brand-600"
+          type="button"
+          onClick={() => {
+            setShowForgotPassword((value) => !value);
+            setResetEmail(email);
+            setResetError("");
+            setResetMessage("");
+          }}
+        >
+          {t(language, "forgotPassword")}
+        </button>
+
+        {showForgotPassword ? (
+          <div className="rounded-[1.25rem] border border-line bg-neutral-50/70 p-4">
+            <p className="text-sm font-black text-ink">{t(language, "resetPassword")}</p>
+            <p className="mt-1 text-sm text-neutral-600">{t(language, "resetPasswordEmailHelper")}</p>
+            <div className="mt-3 space-y-3">
+              <label className="block space-y-2">
+                <span className="field-label">Email</span>
+                <input className="field" type="email" autoComplete="email" value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} />
+              </label>
+              {resetError ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{resetError}</p> : null}
+              {resetMessage ? <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-700">{resetMessage}</p> : null}
+              <button className="btn-secondary w-full" type="button" disabled={resetLoading} onClick={() => handlePasswordReset()}>
+                <KeyRound size={17} aria-hidden="true" />
+                {resetLoading ? t(language, "loading") : t(language, "sendResetLink")}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
 

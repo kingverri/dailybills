@@ -8,13 +8,13 @@ import { AppSectionCard } from "@/components/app-ui";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
-import { currencies, daysOfWeek, incomeTypes, paymentScheduleTypes, workTypes } from "@/lib/constants";
+import { currencies, daysOfWeek, incomeTypes, paymentScheduleTypes, workLogSourceOptionsByType, workLogTypes, workTypes } from "@/lib/constants";
 import { formatCurrency, formatDate, toDateInputValue } from "@/lib/format";
-import { dayOfWeekLabel, languages, scheduleTypeLabel, subscriptionStatusLabel, t } from "@/lib/i18n";
+import { dayOfWeekLabel, languages, scheduleTypeLabel, subscriptionStatusLabel, t, workLogTypeLabel } from "@/lib/i18n";
 import { getCurrentPlan } from "@/lib/planLimits";
 import { plans } from "@/lib/plans";
 import { getSupabaseClient } from "@/lib/supabase";
-import type { AppTheme, DayOfWeek, IncomeType, Language, PaySchedule, PaymentScheduleType, WorkType } from "@/types/app";
+import type { AppTheme, DayOfWeek, IncomeType, Language, PaySchedule, PaymentScheduleType, WorkLogType, WorkType } from "@/types/app";
 
 type ProfileForm = {
   full_name: string;
@@ -25,6 +25,10 @@ type ProfileForm = {
   state: string;
   city: string;
   work_type: WorkType;
+  preferred_work_types: WorkLogType[];
+  preferred_platforms: string[];
+  default_work_type: WorkLogType;
+  default_platform: string;
   language: Language;
   theme: AppTheme;
 };
@@ -61,6 +65,10 @@ export default function SettingsPage() {
     state: "",
     city: "",
     work_type: "DoorDash",
+    preferred_work_types: ["driver"],
+    preferred_platforms: ["DoorDash"],
+    default_work_type: "driver",
+    default_platform: "DoorDash",
     language: "en",
     theme: "dark"
   });
@@ -83,6 +91,50 @@ export default function SettingsPage() {
       ? "active"
       : rawSubscriptionStatus;
   const hasBillingPortal = Boolean(profile?.stripe_customer_id);
+  const selectedWorkTypes = profileForm.preferred_work_types.length > 0 ? profileForm.preferred_work_types : [profileForm.default_work_type];
+  const platformOptions: string[] = Array.from(
+    new Set([...selectedWorkTypes.flatMap((type) => [...workLogSourceOptionsByType[type]]), ...profileForm.preferred_platforms])
+  );
+
+  function legacyWorkTypeFromPlatform(platform: string): WorkType {
+    return workTypes.includes(platform as WorkType) ? (platform as WorkType) : "Other";
+  }
+
+  function togglePreferredWorkType(type: WorkLogType) {
+    const exists = profileForm.preferred_work_types.includes(type);
+    const nextTypes = exists
+      ? profileForm.preferred_work_types.filter((item) => item !== type)
+      : [...profileForm.preferred_work_types, type];
+    const safeTypes = nextTypes.length > 0 ? nextTypes : [type];
+    const nextDefaultType = safeTypes.includes(profileForm.default_work_type) ? profileForm.default_work_type : safeTypes[0];
+    const nextPlatformOptions: string[] = Array.from(new Set(safeTypes.flatMap((item) => [...workLogSourceOptionsByType[item]])));
+    const nextDefaultPlatform = nextPlatformOptions.includes(profileForm.default_platform)
+      ? profileForm.default_platform
+      : nextPlatformOptions[0] ?? "Other";
+
+    setProfileForm({
+      ...profileForm,
+      preferred_work_types: safeTypes,
+      default_work_type: nextDefaultType,
+      default_platform: nextDefaultPlatform,
+      preferred_platforms: profileForm.preferred_platforms.filter((platform) => nextPlatformOptions.includes(platform))
+    });
+  }
+
+  function togglePreferredPlatform(platform: string) {
+    const exists = profileForm.preferred_platforms.includes(platform);
+    const nextPlatforms = exists
+      ? profileForm.preferred_platforms.filter((item) => item !== platform)
+      : [...profileForm.preferred_platforms, platform];
+    const safePlatforms = nextPlatforms.length > 0 ? nextPlatforms : [platform];
+
+    setProfileForm({
+      ...profileForm,
+      preferred_platforms: safePlatforms,
+      default_platform: safePlatforms.includes(profileForm.default_platform) ? profileForm.default_platform : safePlatforms[0],
+      work_type: legacyWorkTypeFromPlatform(safePlatforms.includes(profileForm.default_platform) ? profileForm.default_platform : safePlatforms[0])
+    });
+  }
 
   useEffect(() => {
     if (profile) {
@@ -95,6 +147,12 @@ export default function SettingsPage() {
         state: profile.state ?? "",
         city: profile.city ?? "",
         work_type: profile.work_type ?? "DoorDash",
+        preferred_work_types: profile.preferred_work_types?.length ? profile.preferred_work_types : [profile.default_work_type ?? "driver"],
+        preferred_platforms: profile.preferred_platforms?.length
+          ? profile.preferred_platforms
+          : [profile.default_platform ?? profile.work_type ?? "DoorDash"],
+        default_work_type: profile.default_work_type ?? "driver",
+        default_platform: profile.default_platform ?? profile.work_type ?? "DoorDash",
         language: profile.language ?? "en",
         theme: profile.theme ?? "dark"
       });
@@ -157,7 +215,11 @@ export default function SettingsPage() {
           country: profileForm.country.trim() || "United States",
           state: profileForm.state.trim() || null,
           city: profileForm.city.trim() || null,
-          work_type: profileForm.work_type,
+          work_type: legacyWorkTypeFromPlatform(profileForm.default_platform),
+          preferred_work_types: profileForm.preferred_work_types,
+          preferred_platforms: profileForm.preferred_platforms,
+          default_work_type: profileForm.default_work_type,
+          default_platform: profileForm.default_platform,
           language: profileForm.language,
           theme: profileForm.theme,
           onboarding_completed: true
@@ -407,7 +469,6 @@ export default function SettingsPage() {
 
           <div className="rounded-[1.35rem] border border-line bg-neutral-50/60 p-4">
             <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "workProfile")}</p>
-          <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-2">
               <span className="field-label">{t(language, "mainIncomeType")}</span>
               <select className="field" value={profileForm.income_type} onChange={(event) => setProfileForm({ ...profileForm, income_type: event.target.value as IncomeType })}>
@@ -416,15 +477,77 @@ export default function SettingsPage() {
                 ))}
               </select>
             </label>
-            <label className="block space-y-2">
-              <span className="field-label">{t(language, "workType")}</span>
-              <select className="field" value={profileForm.work_type} onChange={(event) => setProfileForm({ ...profileForm, work_type: event.target.value as WorkType })}>
-                {workTypes.map((type) => (
-                  <option key={type}>{type}</option>
+
+            <div className="mt-4 space-y-3">
+              <p className="field-label">{t(language, "workSetup")}</p>
+              <div className="flex flex-wrap gap-2">
+                {workLogTypes.map((type) => (
+                  <button
+                    key={type}
+                    className={profileForm.preferred_work_types.includes(type) ? "btn-primary min-h-10 px-3" : "btn-secondary min-h-10 px-3"}
+                    type="button"
+                    onClick={() => togglePreferredWorkType(type)}
+                  >
+                    {workLogTypeLabel(language, type)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="mt-4 block space-y-2">
+              <span className="field-label">{t(language, "mainWork")}</span>
+              <select
+                className="field"
+                value={profileForm.default_work_type}
+                onChange={(event) => setProfileForm({ ...profileForm, default_work_type: event.target.value as WorkLogType })}
+              >
+                {selectedWorkTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {workLogTypeLabel(language, type)}
+                  </option>
                 ))}
               </select>
             </label>
-          </div>
+
+            <div className="mt-4 space-y-3">
+              <p className="field-label">{t(language, "jobsPlatforms")}</p>
+              <div className="flex flex-wrap gap-2">
+                {platformOptions.map((platform) => (
+                  <button
+                    key={platform}
+                    className={profileForm.preferred_platforms.includes(platform) ? "btn-primary min-h-10 px-3" : "btn-secondary min-h-10 px-3"}
+                    type="button"
+                    onClick={() => togglePreferredPlatform(platform)}
+                  >
+                    {platform}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="mt-4 block space-y-2">
+              <span className="field-label">{t(language, "defaultPlatform")}</span>
+              <select
+                className="field"
+                value={profileForm.default_platform}
+                onChange={(event) =>
+                  setProfileForm({
+                    ...profileForm,
+                    default_platform: event.target.value,
+                    work_type: legacyWorkTypeFromPlatform(event.target.value),
+                    preferred_platforms: profileForm.preferred_platforms.includes(event.target.value)
+                      ? profileForm.preferred_platforms
+                      : [...profileForm.preferred_platforms, event.target.value]
+                  })
+                }
+              >
+                {platformOptions.map((platform) => (
+                  <option key={platform} value={platform}>
+                    {platform}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           <div className="rounded-[1.35rem] border border-line bg-neutral-50/60 p-4">
