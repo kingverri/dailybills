@@ -207,6 +207,7 @@ export function WorkRecordForm({
   const showTipsField = !showDriverFields || !["OnTrac", "Amazon Flex"].includes(form.platform);
   const showHourlyRateField = hourlyRateTypes.includes(form.work_type);
   const showStopsField = shouldShowStopsField(form);
+  const hasEndTimeWarning = Boolean(form.start_time && form.end_time && form.end_time <= form.start_time);
   const numbers = getWorkRecordNumbers(form);
   const preview = calculateDriverLogMetrics({
     start_time: form.start_time || null,
@@ -316,9 +317,24 @@ export function WorkRecordForm({
       <div className="rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
         <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "scheduleSection")}</p>
         <div className="grid gap-3 sm:grid-cols-2">
-          <TimePicker12Hour label={t(language, "startTime")} value={form.start_time} onChange={(value) => setForm({ ...form, start_time: value })} />
-          <TimePicker12Hour label={t(language, "endTime")} value={form.end_time} onChange={(value) => setForm({ ...form, end_time: value })} />
+          <TimePicker12Hour
+            label={t(language, "startTime")}
+            language={language}
+            value={form.start_time}
+            onChange={(value) => setForm({ ...form, start_time: value })}
+          />
+          <TimePicker12Hour
+            label={t(language, "endTime")}
+            language={language}
+            value={form.end_time}
+            onChange={(value) => setForm({ ...form, end_time: value })}
+          />
         </div>
+        {hasEndTimeWarning ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700">
+            {t(language, "endTimeAfterStartWarning")}
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-[1.35rem] border border-line bg-neutral-50/70 p-4">
