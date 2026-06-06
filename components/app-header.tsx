@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { BarChart3, CircleDollarSign, ClipboardList, Home, LogOut, Settings, Wallet } from "lucide-react";
+import { BarChart3, CircleDollarSign, ClipboardList, Home, LogOut, Receipt, Settings, Wallet } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
@@ -11,6 +11,7 @@ const navItems: { href: string; labelKey: TranslationKey; icon: typeof Home }[] 
   { href: "/dashboard", labelKey: "dashboard", icon: Home },
   { href: "/bills", labelKey: "bills", icon: CircleDollarSign },
   { href: "/income", labelKey: "income", icon: BarChart3 },
+  { href: "/expenses", labelKey: "expenses", icon: Receipt },
   { href: "/driver-log", labelKey: "driverLogNav", icon: ClipboardList },
   { href: "/settings", labelKey: "settings", icon: Settings }
 ];

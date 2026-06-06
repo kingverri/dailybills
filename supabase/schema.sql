@@ -259,6 +259,18 @@ create table if not exists public.driver_logs (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.expenses (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  date date not null default current_date,
+  amount numeric(12, 2) not null check (amount >= 0),
+  merchant text,
+  category text not null default 'other' check (category in ('groceries', 'restaurant_fast_food', 'amazon_online', 'gas', 'car', 'home', 'tools', 'personal', 'other')),
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.driver_logs
 add column if not exists hourly_rate numeric default 0;
 
@@ -277,6 +289,7 @@ create index if not exists gas_stations_user_id_idx on public.gas_stations(user_
 create index if not exists vehicles_user_id_idx on public.vehicles(user_id);
 create index if not exists daily_income_user_date_idx on public.daily_income_entries(user_id, date desc);
 create index if not exists driver_logs_user_date_idx on public.driver_logs(user_id, date desc);
+create index if not exists expenses_user_date_idx on public.expenses(user_id, date desc);
 
 drop trigger if exists set_profiles_updated_at on public.profiles;
 create trigger set_profiles_updated_at before update on public.profiles
@@ -310,6 +323,10 @@ drop trigger if exists set_driver_logs_updated_at on public.driver_logs;
 create trigger set_driver_logs_updated_at before update on public.driver_logs
 for each row execute function public.set_updated_at();
 
+drop trigger if exists set_expenses_updated_at on public.expenses;
+create trigger set_expenses_updated_at before update on public.expenses
+for each row execute function public.set_updated_at();
+
 alter table public.profiles enable row level security;
 alter table public.pay_schedules enable row level security;
 alter table public.bills enable row level security;
@@ -318,6 +335,7 @@ alter table public.gas_stations enable row level security;
 alter table public.vehicles enable row level security;
 alter table public.daily_income_entries enable row level security;
 alter table public.driver_logs enable row level security;
+alter table public.expenses enable row level security;
 
 drop policy if exists "Users can manage own profile" on public.profiles;
 create policy "Users can manage own profile" on public.profiles
@@ -370,6 +388,10 @@ for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 drop policy if exists "Users can manage own driver logs" on public.driver_logs;
 create policy "Users can manage own driver logs" on public.driver_logs
+for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "Users can manage own expenses" on public.expenses;
+create policy "Users can manage own expenses" on public.expenses
 for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 create or replace function public.create_profile_for_new_user()

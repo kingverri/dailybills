@@ -12,8 +12,8 @@ export function formatCurrency(amount: number, currency = "USD") {
 export function formatDate(date: string | Date, language: string = "en") {
   const value = typeof date === "string" && !date.includes("T") ? new Date(`${date}T00:00:00`) : new Date(date);
 
-  if (language === "pt") {
-    return new Intl.DateTimeFormat("pt-BR", {
+  if (language === "pt" || language === "es") {
+    return new Intl.DateTimeFormat(language === "pt" ? "pt-BR" : "es-ES", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric"

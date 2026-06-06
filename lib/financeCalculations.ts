@@ -4,6 +4,7 @@ import type {
   BillOccurrenceStatus,
   DailyIncomeEntry,
   DriverLog,
+  Expense,
   PaySchedule,
   RiskLevel,
   WeeklySettlementDay
@@ -20,6 +21,7 @@ export type BillOccurrence = Bill & {
   occurrenceDate: string;
   daysRemaining: number;
   inclusionReason: BillInclusionReason;
+  paid_at?: string | null;
 };
 
 export type ProjectedIncomeOccurrence = {
@@ -99,11 +101,14 @@ export type MonthlySummary = {
   totalIncome: number;
   totalBillsPaid: number;
   totalUnpaidBills: number;
+  totalExpenses: number;
   estimatedRemainingBalance: number;
   expectedIncome: number;
   totalMiles: number;
   totalGasCost: number;
   netProfit: number;
+  workProfit: number;
+  periodNetResult: number;
 };
 
 export type DriverLogMetrics = {
@@ -311,14 +316,18 @@ export function mergeBillOccurrenceStatuses(
   occurrenceStatuses: BillOccurrenceStatus[] = []
 ) {
   const statusByOccurrence = new Map(
-    occurrenceStatuses.map((status) => [`${status.bill_id}:${status.occurrence_date}`, status.status])
+    occurrenceStatuses.map((status) => [`${status.bill_id}:${status.occurrence_date}`, status])
   );
 
   return occurrences.map((occurrence) => {
-    const status = statusByOccurrence.get(`${occurrence.id}:${occurrence.occurrenceDate}`);
+    const occurrenceStatus = statusByOccurrence.get(`${occurrence.id}:${occurrence.occurrenceDate}`);
 
-    if (status) {
-      return { ...occurrence, status };
+    if (occurrenceStatus) {
+      return {
+        ...occurrence,
+        status: occurrenceStatus.status,
+        paid_at: occurrenceStatus.paid_at
+      };
     }
 
     return {
@@ -994,7 +1003,8 @@ export function calculateMonthlySummary(
   paySchedules: PaySchedule[] = [],
   currentBalance = 0,
   asOf: DateLike = new Date(),
-  billOccurrenceStatuses: BillOccurrenceStatus[] = []
+  billOccurrenceStatuses: BillOccurrenceStatus[] = [],
+  expenses: Expense[] = []
 ): MonthlySummary {
   const today = startOfDay(asOf);
   const start = monthStart(today);
@@ -1013,6 +1023,9 @@ export function calculateMonthlySummary(
     (sum, entry) => sum + (normalizeAmount(entry.gas_spent) || normalizeAmount(entry.estimated_gas_cost)),
     0
   );
+  const totalExpenses = expenses
+    .filter((expense) => isBetweenInclusive(startOfDay(expense.date), start, today))
+    .reduce((sum, expense) => sum + normalizeAmount(expense.amount), 0);
   const expectedIncome =
     tomorrow <= end
       ? calculateExpectedIncomeWithoutDoubleCounting(paySchedules, entries, tomorrow, end).reduce(
@@ -1020,22 +1033,29 @@ export function calculateMonthlySummary(
           0
         )
       : 0;
-  const totalBillsPaid = monthBillOccurrences
-    .filter((bill) => bill.status === "paid")
-    .reduce((sum, bill) => sum + normalizeAmount(bill.amount), 0);
+  const billAmountById = new Map(bills.map((bill) => [bill.id, normalizeAmount(bill.amount)]));
+  const totalBillsPaid = billOccurrenceStatuses
+    .filter((occurrence) => occurrence.status === "paid" && occurrence.paid_at)
+    .filter((occurrence) => isBetweenInclusive(startOfDay(occurrence.paid_at ?? ""), start, today))
+    .reduce((sum, occurrence) => sum + (billAmountById.get(occurrence.bill_id) ?? 0), 0);
   const totalUnpaidBills = monthBillOccurrences
     .filter((bill) => bill.status === "unpaid")
     .reduce((sum, bill) => sum + normalizeAmount(bill.amount), 0);
+  const workProfit = totalIncome - totalGasCost;
+  const periodNetResult = totalIncome - totalGasCost - totalBillsPaid - totalExpenses;
 
   return {
     totalIncome,
     totalBillsPaid,
     totalUnpaidBills,
+    totalExpenses,
     estimatedRemainingBalance:
-      normalizeAmount(currentBalance) + totalIncome + expectedIncome - totalUnpaidBills - totalGasCost,
+      normalizeAmount(currentBalance) + totalIncome + expectedIncome - totalUnpaidBills - totalGasCost - totalExpenses - totalBillsPaid,
     expectedIncome,
     totalMiles: monthEntriesToDate.reduce((sum, entry) => sum + normalizeAmount(entry.miles_driven), 0),
     totalGasCost,
-    netProfit: totalIncome - totalGasCost
+    netProfit: workProfit,
+    workProfit,
+    periodNetResult
   };
 }

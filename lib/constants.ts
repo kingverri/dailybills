@@ -94,6 +94,18 @@ export const billCategories = [
 
 export const billStatuses = ["unpaid", "paid"] as const;
 
+export const expenseCategories = [
+  "groceries",
+  "restaurant_fast_food",
+  "amazon_online",
+  "gas",
+  "car",
+  "home",
+  "tools",
+  "personal",
+  "other"
+] as const;
+
 export const fuelTypes = ["Regular", "Midgrade", "Premium", "Diesel"] as const;
 
 export const currencies = ["USD", "CAD", "MXN", "EUR", "GBP"] as const;

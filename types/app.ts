@@ -2,6 +2,7 @@ import type {
   billCategories,
   billRecurrences,
   billStatuses,
+  expenseCategories,
   daysOfWeek,
   fuelTypes,
   incomeEntryTypes,
@@ -21,6 +22,7 @@ export type DayOfWeek = (typeof daysOfWeek)[number];
 export type BillRecurrence = (typeof billRecurrences)[number];
 export type BillCategory = (typeof billCategories)[number];
 export type BillStatus = (typeof billStatuses)[number];
+export type ExpenseCategory = (typeof expenseCategories)[number];
 export type BillRepeatUntilType = "never" | "specific_month";
 export type FuelType = (typeof fuelTypes)[number];
 export type IncomeEntryType = (typeof incomeEntryTypes)[number]["value"];
@@ -139,6 +141,18 @@ export type DailyIncomeEntry = {
   gas_spent: number;
   estimated_gas_cost: number;
   net_profit: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Expense = {
+  id: string;
+  user_id: string;
+  date: string;
+  amount: number;
+  merchant: string | null;
+  category: ExpenseCategory;
   notes: string | null;
   created_at: string;
   updated_at: string;

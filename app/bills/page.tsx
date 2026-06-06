@@ -684,6 +684,11 @@ export default function BillsPage() {
                       <p className="text-sm font-medium text-neutral-600">
                         {t(language, "due")} {formatDate(bill.occurrenceDate, language)}
                       </p>
+                      {bill.status === "paid" && bill.paid_at ? (
+                        <p className="mt-1 text-xs font-semibold text-neutral-500">
+                          {t(language, "paidOn")} {formatDate(bill.paid_at, language)}
+                        </p>
+                      ) : null}
                     <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
                       <span className={`badge ${status.className}`}>
                         <StatusIcon size={13} aria-hidden="true" />

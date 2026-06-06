@@ -27,6 +27,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import {
+  ExpenseForm,
+  buildExpensePayload,
+  createExpenseForm,
+  validateExpenseForm,
+  type ExpenseFormValues
+} from "@/components/expense-form";
+import {
   WorkRecordForm,
   buildWorkRecordPayload,
   createWorkRecordForm,
@@ -50,7 +57,7 @@ import { formatCurrency, formatDate, toDateInputValue } from "@/lib/format";
 import { projectionPeriodLabel, t } from "@/lib/i18n";
 import { canAddDriverLog, canUseCustomProjection, getCurrentMonthDriverLogCount, getCurrentPlan } from "@/lib/planLimits";
 import { getSupabaseClient } from "@/lib/supabase";
-import type { Bill, BillOccurrenceStatus, DailyIncomeEntry, DriverLog, PaySchedule, Vehicle } from "@/types/app";
+import type { Bill, BillOccurrenceStatus, DailyIncomeEntry, DriverLog, Expense, PaySchedule, Vehicle } from "@/types/app";
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
@@ -59,7 +66,11 @@ export default function DashboardPage() {
   const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
   const [entries, setEntries] = useState<DailyIncomeEntry[]>([]);
   const [driverLogs, setDriverLogs] = useState<DriverLog[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [quickExpenseForm, setQuickExpenseForm] = useState<ExpenseFormValues>(() => createExpenseForm());
+  const [showQuickExpenseModal, setShowQuickExpenseModal] = useState(false);
+  const [savingQuickExpense, setSavingQuickExpense] = useState(false);
   const [quickLogForm, setQuickLogForm] = useState<WorkRecordFormValues>(() => createWorkRecordForm(profile));
   const [showQuickLogModal, setShowQuickLogModal] = useState(false);
   const [savingQuickLog, setSavingQuickLog] = useState(false);
@@ -110,17 +121,18 @@ export default function DashboardPage() {
 
     setLoading(true);
     const supabase = getSupabaseClient();
-    const [billResult, occurrenceResult, scheduleResult, entryResult, driverLogResult, vehicleResult] = await Promise.all([
+    const [billResult, occurrenceResult, scheduleResult, entryResult, expenseResult, driverLogResult, vehicleResult] = await Promise.all([
       supabase.from("bills").select("*").eq("user_id", user.id),
       supabase.from("bill_occurrences").select("*").eq("user_id", user.id),
       supabase.from("pay_schedules").select("*").eq("user_id", user.id),
       supabase.from("daily_income_entries").select("*").eq("user_id", user.id),
+      supabase.from("expenses").select("*").eq("user_id", user.id),
       supabase.from("driver_logs").select("*").eq("user_id", user.id).order("date", { ascending: false }),
       supabase.from("vehicles").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
     ]);
 
     const firstError =
-      billResult.error ?? occurrenceResult.error ?? scheduleResult.error ?? entryResult.error ?? driverLogResult.error ?? vehicleResult.error;
+      billResult.error ?? occurrenceResult.error ?? scheduleResult.error ?? entryResult.error ?? expenseResult.error ?? driverLogResult.error ?? vehicleResult.error;
 
     if (firstError) {
       setError(firstError.message);
@@ -129,6 +141,7 @@ export default function DashboardPage() {
       setBillOccurrenceStatuses(occurrenceResult.data ?? []);
       setPaySchedules(scheduleResult.data ?? []);
       setEntries(entryResult.data ?? []);
+      setExpenses(expenseResult.data ?? []);
       setDriverLogs(driverLogResult.data ?? []);
       setVehicles(vehicleResult.data ?? []);
     }
@@ -184,6 +197,39 @@ export default function DashboardPage() {
     await loadDashboard();
   }
 
+  async function saveQuickExpense(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setQuickLogMessage("");
+
+    if (!user) {
+      setError(t(language, "loginAgain"));
+      return;
+    }
+
+    if (!validateExpenseForm(quickExpenseForm)) {
+      setError(t(language, "expenseRequiredError"));
+      return;
+    }
+
+    setSavingQuickExpense(true);
+    const supabase = getSupabaseClient();
+    const { error: saveError } = await supabase
+      .from("expenses")
+      .insert({ ...buildExpensePayload(quickExpenseForm), user_id: user.id });
+    setSavingQuickExpense(false);
+
+    if (saveError) {
+      setError(saveError.message);
+      return;
+    }
+
+    setQuickLogMessage(t(language, "expenseSaved"));
+    setShowQuickExpenseModal(false);
+    setQuickExpenseForm(createExpenseForm());
+    await loadDashboard();
+  }
+
   async function markOccurrencePaid(bill: BillOccurrence) {
     if (!user) {
       setError(t(language, "loginAgain"));
@@ -228,7 +274,7 @@ export default function DashboardPage() {
       projectionRange,
       asOf
     });
-    const summary = calculateMonthlySummary(entries, bills, paySchedules, currentBalance, asOf, billOccurrenceStatuses);
+    const summary = calculateMonthlySummary(entries, bills, paySchedules, currentBalance, asOf, billOccurrenceStatuses, expenses);
     const todayValue = toDateInputValue(asOf);
     const overdueBills = getOverdueBills(bills, billOccurrenceStatuses, asOf);
     const upcomingBills = cashFlow.bills.filter((bill) => bill.occurrenceDate >= todayValue);
@@ -264,7 +310,7 @@ export default function DashboardPage() {
       summary,
       includedBills: upcomingBills
     };
-  }, [asOf, billOccurrenceStatuses, bills, currentBalance, entries, paySchedules, projectionRange]);
+  }, [asOf, billOccurrenceStatuses, bills, currentBalance, entries, expenses, paySchedules, projectionRange]);
 
   const statusCopy = {
     low: {
@@ -323,7 +369,7 @@ export default function DashboardPage() {
         title={t(language, "todayName", { name: profile?.full_name?.split(" ")[0] ?? t(language, "driver") })}
         subtitle={t(language, "dashboardSubtitle")}
       >
-        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3 lg:flex lg:w-auto">
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:flex xl:w-auto">
           <Link className="btn-secondary" href="/bills">
             <Plus size={18} aria-hidden="true" />
             {t(language, "addBill")}
@@ -332,6 +378,10 @@ export default function DashboardPage() {
             <Plus size={18} aria-hidden="true" />
             {t(language, "addIncome")}
           </Link>
+          <button className="btn-secondary" type="button" onClick={() => setShowQuickExpenseModal(true)}>
+            <Plus size={18} aria-hidden="true" />
+            {t(language, "addExpense")}
+          </button>
           <button className="btn-primary" type="button" onClick={() => setShowQuickLogModal(true)}>
             <Plus size={18} aria-hidden="true" />
             {t(language, "logWork")}
@@ -660,9 +710,15 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <SummaryItem icon={PiggyBank} label={t(language, "totalIncome")} value={formatCurrency(dashboard.summary.totalIncome, currency)} tone="good" />
-              <SummaryItem icon={Activity} label={t(language, "netProfit")} value={formatCurrency(dashboard.summary.netProfit, currency)} />
+              <SummaryItem icon={Activity} label={t(language, "workProfit")} value={formatCurrency(dashboard.summary.workProfit, currency)} />
+              <SummaryItem
+                icon={Wallet}
+                label={t(language, "periodNetResult")}
+                value={formatCurrency(dashboard.summary.periodNetResult, currency)}
+                tone={dashboard.summary.periodNetResult < 0 ? "danger" : "good"}
+              />
               <SummaryItem icon={Receipt} label={t(language, "unpaidBills")} value={formatCurrency(dashboard.summary.totalUnpaidBills, currency)} tone={dashboard.summary.totalUnpaidBills > 0 ? "warn" : "good"} />
             </div>
             <div className="mt-4 border-t border-line pt-3">
@@ -676,7 +732,8 @@ export default function DashboardPage() {
               </button>
               {showFullMonthlySummary ? (
                 <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-5">
-                  <SummaryItem icon={CheckCircle2} label={t(language, "billsPaid")} value={formatCurrency(dashboard.summary.totalBillsPaid, currency)} />
+                  <SummaryItem icon={CheckCircle2} label={t(language, "paidBills")} value={formatCurrency(dashboard.summary.totalBillsPaid, currency)} />
+                  <SummaryItem icon={Receipt} label={t(language, "periodExpenses")} value={formatCurrency(dashboard.summary.totalExpenses, currency)} />
                   <SummaryItem
                     icon={Wallet}
                     label={t(language, "estimatedBalance")}
@@ -756,6 +813,31 @@ export default function DashboardPage() {
               submitLabel={t(language, "saveLog")}
               onCancel={() => setShowQuickLogModal(false)}
               onSubmit={saveQuickWorkLog}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {showQuickExpenseModal ? (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
+          <div className="mx-auto max-w-xl rounded-[2rem] border border-line bg-surface p-4 shadow-2xl sm:p-6">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-700">{t(language, "expenses")}</p>
+                <h2 className="mt-1 text-2xl font-black text-ink">{t(language, "addExpense")}</h2>
+              </div>
+              <button className="btn-secondary min-h-10 px-3" type="button" onClick={() => setShowQuickExpenseModal(false)}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+            <ExpenseForm
+              form={quickExpenseForm}
+              language={language}
+              saving={savingQuickExpense}
+              setForm={setQuickExpenseForm}
+              submitLabel={t(language, "addExpense")}
+              onCancel={() => setShowQuickExpenseModal(false)}
+              onSubmit={saveQuickExpense}
             />
           </div>
         </div>
