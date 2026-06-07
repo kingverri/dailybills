@@ -11,6 +11,7 @@ import { expenseCategories } from "@/lib/constants";
 import { formatCurrency, formatDate, formatMonthYear, toDateInputValue } from "@/lib/format";
 import { expenseCategoryLabel, t } from "@/lib/i18n";
 import { getSupabaseClient } from "@/lib/supabase";
+import { usePersistentDraft } from "@/hooks/use-persistent-draft";
 import type { Expense, ExpenseCategory } from "@/types/app";
 
 type ExpenseFilter = ExpenseCategory | "all";
@@ -22,8 +23,13 @@ function currentMonthValue() {
 export default function ExpensesPage() {
   const { user, profile } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [form, setForm] = useState<ExpenseFormValues>(() => createExpenseForm());
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm, clearExpenseDraft] = usePersistentDraft<ExpenseFormValues>({
+    key: user && !editingId ? `dailybills:draft:${user.id}:expense` : null,
+    initialValue: () => createExpenseForm(),
+    enabled: Boolean(user && !editingId),
+    resetWhenDisabled: false
+  });
   const [showForm, setShowForm] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthValue());
   const [categoryFilter, setCategoryFilter] = useState<ExpenseFilter>("all");
@@ -84,7 +90,7 @@ export default function ExpensesPage() {
   }, [user?.id]);
 
   function resetForm() {
-    setForm(createExpenseForm());
+    clearExpenseDraft(createExpenseForm());
     setEditingId(null);
     setError("");
   }
@@ -174,7 +180,7 @@ export default function ExpensesPage() {
             saving={saving}
             setForm={setForm}
             submitLabel={t(language, "addExpense")}
-            onCancel={editingId ? resetForm : undefined}
+            onCancel={resetForm}
             onSubmit={saveExpense}
           />
         </AppActionPanel>

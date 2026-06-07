@@ -41,6 +41,7 @@ import {
   type WorkRecordFormValues
 } from "@/components/work-record-form";
 import { useAuth } from "@/components/auth-provider";
+import { usePersistentDraft } from "@/hooks/use-persistent-draft";
 import {
   calculateCashFlowProjectionForPeriod,
   calculateProjectedBalanceAfterBills,
@@ -68,10 +69,18 @@ export default function DashboardPage() {
   const [driverLogs, setDriverLogs] = useState<DriverLog[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [quickExpenseForm, setQuickExpenseForm] = useState<ExpenseFormValues>(() => createExpenseForm());
+  const [quickExpenseForm, setQuickExpenseForm, clearQuickExpenseDraft] = usePersistentDraft<ExpenseFormValues>({
+    key: user ? `dailybills:draft:${user.id}:dashboard-expense` : null,
+    initialValue: () => createExpenseForm(),
+    enabled: Boolean(user)
+  });
   const [showQuickExpenseModal, setShowQuickExpenseModal] = useState(false);
   const [savingQuickExpense, setSavingQuickExpense] = useState(false);
-  const [quickLogForm, setQuickLogForm] = useState<WorkRecordFormValues>(() => createWorkRecordForm(profile));
+  const [quickLogForm, setQuickLogForm, clearQuickLogDraft] = usePersistentDraft<WorkRecordFormValues>({
+    key: user ? `dailybills:draft:${user.id}:dashboard-work-record` : null,
+    initialValue: () => createWorkRecordForm(profile),
+    enabled: Boolean(user)
+  });
   const [showQuickLogModal, setShowQuickLogModal] = useState(false);
   const [savingQuickLog, setSavingQuickLog] = useState(false);
   const [quickLogMessage, setQuickLogMessage] = useState("");
@@ -153,12 +162,6 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  useEffect(() => {
-    if (!showQuickLogModal) {
-      setQuickLogForm(createWorkRecordForm(profile));
-    }
-  }, [profile, showQuickLogModal]);
-
   async function saveQuickWorkLog(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -193,7 +196,7 @@ export default function DashboardPage() {
 
     setQuickLogMessage(t(language, "logSaved"));
     setShowQuickLogModal(false);
-    setQuickLogForm(createWorkRecordForm(profile));
+    clearQuickLogDraft(createWorkRecordForm(profile));
     await loadDashboard();
   }
 
@@ -226,8 +229,18 @@ export default function DashboardPage() {
 
     setQuickLogMessage(t(language, "expenseSaved"));
     setShowQuickExpenseModal(false);
-    setQuickExpenseForm(createExpenseForm());
+    clearQuickExpenseDraft(createExpenseForm());
     await loadDashboard();
+  }
+
+  function discardQuickWorkLog() {
+    clearQuickLogDraft(createWorkRecordForm(profile));
+    setShowQuickLogModal(false);
+  }
+
+  function discardQuickExpense() {
+    clearQuickExpenseDraft(createExpenseForm());
+    setShowQuickExpenseModal(false);
   }
 
   async function markOccurrencePaid(bill: BillOccurrence) {
@@ -791,7 +804,7 @@ export default function DashboardPage() {
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-700">{t(language, "driverLog")}</p>
                 <h2 className="mt-1 text-2xl font-black text-ink">{t(language, "logTodaysWork")}</h2>
               </div>
-              <button className="btn-secondary min-h-10 px-3" type="button" onClick={() => setShowQuickLogModal(false)}>
+              <button className="btn-secondary min-h-10 px-3" type="button" onClick={discardQuickWorkLog}>
                 <X size={18} aria-hidden="true" />
               </button>
             </div>
@@ -811,7 +824,7 @@ export default function DashboardPage() {
               saving={savingQuickLog}
               setForm={setQuickLogForm}
               submitLabel={t(language, "saveLog")}
-              onCancel={() => setShowQuickLogModal(false)}
+              onCancel={discardQuickWorkLog}
               onSubmit={saveQuickWorkLog}
             />
           </div>
@@ -826,7 +839,7 @@ export default function DashboardPage() {
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-700">{t(language, "expenses")}</p>
                 <h2 className="mt-1 text-2xl font-black text-ink">{t(language, "addExpense")}</h2>
               </div>
-              <button className="btn-secondary min-h-10 px-3" type="button" onClick={() => setShowQuickExpenseModal(false)}>
+              <button className="btn-secondary min-h-10 px-3" type="button" onClick={discardQuickExpense}>
                 <X size={18} aria-hidden="true" />
               </button>
             </div>
@@ -836,7 +849,7 @@ export default function DashboardPage() {
               saving={savingQuickExpense}
               setForm={setQuickExpenseForm}
               submitLabel={t(language, "addExpense")}
-              onCancel={() => setShowQuickExpenseModal(false)}
+              onCancel={discardQuickExpense}
               onSubmit={saveQuickExpense}
             />
           </div>

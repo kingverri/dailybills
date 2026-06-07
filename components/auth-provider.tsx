@@ -1,7 +1,7 @@
 "use client";
 
 import type { Session, User } from "@supabase/supabase-js";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { normalizeLanguage } from "@/lib/i18n";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { AppTheme, Language, Profile, UserPlan, WeeklySettlementDay, WorkLogType } from "@/types/app";
@@ -163,6 +163,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const initialLoadCompleteRef = useRef(false);
+  const userRef = useRef<User | null>(null);
+  const profileRef = useRef<Profile | null>(null);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("dailybills-theme");
@@ -264,7 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadAuthState = useCallback(async () => {
     const supabase = getSupabaseClient();
-    setLoading(true);
+    setLoading(!initialLoadCompleteRef.current);
     setError(null);
 
     try {
@@ -276,19 +287,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw sessionError;
           }
 
-          setSession(data.session);
-          setUser(data.session?.user ?? null);
+          const nextSession = data.session;
+          const nextUser = nextSession?.user ?? null;
+          let nextProfile: Profile | null = null;
 
-          if (data.session?.user) {
+          if (nextUser) {
             try {
-              setProfile(await loadProfile(data.session.user));
+              nextProfile = await loadProfile(nextUser);
             } catch (profileError) {
               console.error(profileError);
-              setProfile(normalizeProfile(buildRuntimeFallbackProfile(data.session.user), data.session.user));
+              nextProfile = normalizeProfile(buildRuntimeFallbackProfile(nextUser), nextUser);
             }
-          } else {
-            setProfile(null);
           }
+
+          setSession(nextSession);
+          setUser(nextUser);
+          setProfile(nextProfile);
         })(),
         AUTH_LOAD_TIMEOUT_MS
       );
@@ -296,6 +310,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error(authError);
       setError("plan_load_failed");
     } finally {
+      initialLoadCompleteRef.current = true;
       setLoading(false);
     }
   }, [loadProfile]);
@@ -306,23 +321,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const handleAuthSession = useCallback(
     async (nextSession: Session | null) => {
-      setLoading(true);
+      const shouldBlockUi = !initialLoadCompleteRef.current && !userRef.current && !profileRef.current;
+      if (shouldBlockUi) {
+        setLoading(true);
+      }
       setError(null);
 
       try {
         await withTimeout(
           (async () => {
-            setSession(nextSession);
-            setUser(nextSession?.user ?? null);
+            const nextUser = nextSession?.user ?? null;
 
-            if (nextSession?.user) {
+            if (nextUser) {
+              let nextProfile = profileRef.current;
               try {
-                setProfile(await loadProfile(nextSession.user));
+                nextProfile = await loadProfile(nextUser);
               } catch (profileError) {
                 console.error(profileError);
-                setProfile(normalizeProfile(buildRuntimeFallbackProfile(nextSession.user), nextSession.user));
+                nextProfile = profileRef.current ?? normalizeProfile(buildRuntimeFallbackProfile(nextUser), nextUser);
               }
+
+              setSession(nextSession);
+              setUser(nextUser);
+              setProfile(nextProfile);
             } else {
+              setSession(null);
+              setUser(null);
               setProfile(null);
             }
           })(),
@@ -330,8 +354,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
       } catch (authError) {
         console.error(authError);
-        setError("plan_load_failed");
+        if (!userRef.current && !profileRef.current) {
+          setError("plan_load_failed");
+        }
       } finally {
+        initialLoadCompleteRef.current = true;
         setLoading(false);
       }
     },

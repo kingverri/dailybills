@@ -34,7 +34,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return <PlanLoadError language={profile?.language} onRetry={retryAuth} onLogout={signOut} />;
   }
 
-  if (loading || !user || (!isOnboarding && profile && !profile.onboarding_completed)) {
+  const shouldShowInitialLoader = loading && !user && !profile;
+
+  if (shouldShowInitialLoader || !user || (!isOnboarding && profile && !profile.onboarding_completed)) {
     return <LoadingScreen label={t(profile?.language, "gettingPlanReady")} />;
   }
 

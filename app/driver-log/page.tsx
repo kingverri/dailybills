@@ -65,6 +65,7 @@ import {
 } from "@/lib/planLimits";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
+import { usePersistentDraft } from "@/hooks/use-persistent-draft";
 import type { DriverLog, PaySchedule, WeeklySettlementDay, WorkLogType } from "@/types/app";
 
 type ExportFormat = "csv" | "xlsx" | "google";
@@ -94,9 +95,14 @@ export default function DriverLogPage() {
   const { user, profile, refreshProfile } = useAuth();
   const [logs, setLogs] = useState<DriverLog[]>([]);
   const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
-  const [form, setForm] = useState<WorkRecordFormValues>(() => createWorkRecordForm(profile));
   const [settlementDay, setSettlementDay] = useState<WeeklySettlementDay>("friday");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm, clearWorkRecordDraft] = usePersistentDraft<WorkRecordFormValues>({
+    key: user && !editingId ? `dailybills:draft:${user.id}:work-record` : null,
+    initialValue: () => createWorkRecordForm(profile),
+    enabled: Boolean(user && !editingId),
+    resetWhenDisabled: false
+  });
   const [showForm, setShowForm] = useState(false);
   const [showCurrentFullSummary, setShowCurrentFullSummary] = useState(false);
   const [showPreviousFullSummary, setShowPreviousFullSummary] = useState(false);
@@ -176,14 +182,8 @@ export default function DriverLogPage() {
     setSettlementDay(profile?.weekly_settlement_day ?? weeklyScheduleDay ?? "friday");
   }, [paySchedules, profile?.weekly_settlement_day]);
 
-  useEffect(() => {
-    if (!editingId) {
-      setForm(createWorkRecordForm(profile));
-    }
-  }, [editingId, profile]);
-
   function resetForm() {
-    setForm(createWorkRecordForm(profile));
+    clearWorkRecordDraft(createWorkRecordForm(profile));
     setEditingId(null);
     setError("");
   }
@@ -441,7 +441,7 @@ export default function DriverLogPage() {
             saving={saving}
             setForm={setForm}
             submitLabel={t(language, "saveLog")}
-            onCancel={editingId ? resetForm : undefined}
+            onCancel={resetForm}
             onSubmit={handleSubmit}
             footer={
               !editingId && !canCreateDriverLog ? (

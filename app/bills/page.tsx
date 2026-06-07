@@ -35,6 +35,7 @@ import { billRecurrenceLabel, t } from "@/lib/i18n";
 import { canAddBill, getCurrentPlan } from "@/lib/planLimits";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
+import { usePersistentDraft } from "@/hooks/use-persistent-draft";
 import type { Bill, BillCategory, BillOccurrenceStatus, BillRecurrence, BillRepeatUntilType, BillStatus } from "@/types/app";
 
 type BillForm = {
@@ -190,8 +191,13 @@ export default function BillsPage() {
   const { user, profile } = useAuth();
   const [bills, setBills] = useState<Bill[]>([]);
   const [billOccurrenceStatuses, setBillOccurrenceStatuses] = useState<BillOccurrenceStatus[]>([]);
-  const [form, setForm] = useState<BillForm>(initialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm, clearBillDraft] = usePersistentDraft<BillForm>({
+    key: user && !editingId ? `dailybills:draft:${user.id}:bill` : null,
+    initialValue: initialForm,
+    enabled: Boolean(user && !editingId),
+    resetWhenDisabled: false
+  });
   const [showForm, setShowForm] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(toDateInputValue().slice(0, 7));
   const [filter, setFilter] = useState<BillFilter>("all");
@@ -289,7 +295,7 @@ export default function BillsPage() {
   }, [user?.id]);
 
   function resetForm() {
-    setForm(initialForm);
+    clearBillDraft(initialForm);
     setEditingId(null);
     setError("");
   }
@@ -372,6 +378,7 @@ export default function BillsPage() {
       return;
     }
 
+    clearBillDraft(initialForm);
     router.push("/dashboard");
   }
 
@@ -568,11 +575,16 @@ export default function BillsPage() {
               <Plus size={18} aria-hidden="true" />
               {saving ? t(language, "saving") : editingId ? t(language, "saveBill") : t(language, "addBill")}
             </button>
-            {editingId ? (
-              <button className="btn-secondary" type="button" onClick={resetForm}>
-                {t(language, "cancel")}
-              </button>
-            ) : null}
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={() => {
+                resetForm();
+                setShowForm(false);
+              }}
+            >
+              {t(language, "cancel")}
+            </button>
             <Link className="btn-secondary flex-1" href="/dashboard">
               {t(language, "backToDashboard")}
             </Link>
