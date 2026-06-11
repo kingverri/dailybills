@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import {
   ExpenseForm,
@@ -86,6 +86,9 @@ export default function DashboardPage() {
   const [savingQuickLog, setSavingQuickLog] = useState(false);
   const [quickLogMessage, setQuickLogMessage] = useState("");
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [addMenuPosition, setAddMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const addMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const addMenuRef = useRef<HTMLDivElement | null>(null);
   const [asOf] = useState(() => new Date());
   const [projectionPeriod, setProjectionPeriod] = useState<ProjectionPeriod>("this_month");
   const [customStartDate, setCustomStartDate] = useState(() => toDateInputValue(new Date()));
@@ -129,6 +132,73 @@ export default function DashboardPage() {
     setUpgradeMessage("");
     setProjectionPeriod(nextPeriod);
   }
+
+  function updateAddMenuPosition() {
+    const button = addMenuButtonRef.current;
+    if (!button) {
+      return;
+    }
+
+    const rect = button.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const menuWidth = viewportWidth < 640 ? viewportWidth - 32 : Math.min(256, viewportWidth - 32);
+    const left = viewportWidth < 640
+      ? 16
+      : Math.min(Math.max(16, rect.right - menuWidth), viewportWidth - menuWidth - 16);
+
+    setAddMenuPosition({
+      top: rect.bottom + 8,
+      left,
+      width: menuWidth
+    });
+  }
+
+  function toggleAddMenu() {
+    if (showAddMenu) {
+      setShowAddMenu(false);
+      return;
+    }
+
+    updateAddMenuPosition();
+    setShowAddMenu(true);
+  }
+
+  useEffect(() => {
+    if (!showAddMenu) {
+      return;
+    }
+
+    updateAddMenuPosition();
+
+    function handlePointerDown(event: MouseEvent | TouchEvent) {
+      const target = event.target as Node;
+      if (addMenuRef.current?.contains(target) || addMenuButtonRef.current?.contains(target)) {
+        return;
+      }
+
+      setShowAddMenu(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowAddMenu(false);
+      }
+    }
+
+    window.addEventListener("resize", updateAddMenuPosition);
+    window.addEventListener("scroll", updateAddMenuPosition, true);
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("resize", updateAddMenuPosition);
+      window.removeEventListener("scroll", updateAddMenuPosition, true);
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showAddMenu]);
 
   async function loadDashboard() {
     if (!user) {
@@ -395,38 +465,66 @@ export default function DashboardPage() {
             <Plus size={18} aria-hidden="true" />
             {t(language, "logWork")}
           </button>
-          <div className="relative">
-            <button className="btn-secondary w-full sm:w-auto" type="button" onClick={() => setShowAddMenu((value) => !value)}>
-            <Plus size={18} aria-hidden="true" />
+          <div>
+            <button
+              ref={addMenuButtonRef}
+              aria-expanded={showAddMenu}
+              aria-haspopup="menu"
+              className="btn-secondary w-full sm:w-auto"
+              type="button"
+              onClick={toggleAddMenu}
+            >
+              <Plus size={18} aria-hidden="true" />
               {t(language, "addMenu")}
               {showAddMenu ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
             </button>
-            {showAddMenu ? (
-              <div className="absolute right-0 z-30 mt-2 w-full min-w-56 rounded-2xl border border-line bg-surface p-2 shadow-card sm:w-64">
-                <Link className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:text-ink" href="/bills">
-                  <Receipt size={17} aria-hidden="true" />
-                  {t(language, "bill")}
-                </Link>
-                <button
-                  className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:text-ink"
-                  type="button"
-                  onClick={() => {
-                    setShowAddMenu(false);
-                    setShowQuickExpenseModal(true);
-                  }}
-                >
-                  <Wallet size={17} aria-hidden="true" />
-                  {t(language, "expense")}
-                </button>
-                <Link className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:text-ink" href="/income">
-                  <BarChart3 size={17} aria-hidden="true" />
-                  {t(language, "payment")}
-                </Link>
-              </div>
-            ) : null}
           </div>
         </div>
       </PageHeader>
+
+      {showAddMenu && addMenuPosition ? (
+        <div
+          ref={addMenuRef}
+          className="fixed z-[100] rounded-2xl border border-line bg-surface p-2 shadow-2xl"
+          role="menu"
+          style={{
+            top: addMenuPosition.top,
+            left: addMenuPosition.left,
+            width: addMenuPosition.width
+          }}
+        >
+          <Link
+            className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:text-ink"
+            href="/bills"
+            role="menuitem"
+            onClick={() => setShowAddMenu(false)}
+          >
+            <Receipt size={17} aria-hidden="true" />
+            {t(language, "bill")}
+          </Link>
+          <button
+            className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:text-ink"
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setShowAddMenu(false);
+              setShowQuickExpenseModal(true);
+            }}
+          >
+            <Wallet size={17} aria-hidden="true" />
+            {t(language, "expense")}
+          </button>
+          <Link
+            className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:text-ink"
+            href="/income"
+            role="menuitem"
+            onClick={() => setShowAddMenu(false)}
+          >
+            <BarChart3 size={17} aria-hidden="true" />
+            {t(language, "payment")}
+          </Link>
+        </div>
+      ) : null}
 
       {quickLogMessage ? <p className="mb-4 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-700">{quickLogMessage}</p> : null}
       {error ? <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
