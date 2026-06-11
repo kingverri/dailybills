@@ -26,6 +26,7 @@ export function BottomNav() {
   const router = useRouter();
   const { profile, signOut } = useAuth();
   const [showMore, setShowMore] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const language = profile?.language ?? "en";
 
   async function handleLogout() {
@@ -35,6 +36,32 @@ export function BottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/92 px-2 py-2 shadow-2xl backdrop-blur-2xl lg:hidden">
+      {showQuickAdd ? (
+        <div className="mx-auto mb-2 max-w-md rounded-3xl border border-line bg-surface p-2 shadow-card">
+          <div className="grid grid-cols-2 gap-1">
+            {[
+              { href: "/driver-log", label: t(language, "logWork"), icon: ClipboardList },
+              { href: "/expenses", label: t(language, "addExpense"), icon: Receipt },
+              { href: "/bills", label: t(language, "addBill"), icon: CircleDollarSign },
+              { href: "/income", label: t(language, "addPayment"), icon: BarChart3 }
+            ].map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.href}
+                  className="flex min-h-12 items-center gap-2 rounded-2xl px-3 text-sm font-black text-ink hover:bg-neutral-50"
+                  href={item.href}
+                  onClick={() => setShowQuickAdd(false)}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
       {showMore ? (
         <div className="mx-auto mb-2 max-w-md rounded-3xl border border-line bg-surface p-2 shadow-card">
           <div className="grid gap-1">
@@ -93,12 +120,26 @@ export function BottomNav() {
               : "text-neutral-500 hover:bg-surface hover:text-ink"
           )}
           type="button"
-          onClick={() => setShowMore((value) => !value)}
+          onClick={() => {
+            setShowQuickAdd(false);
+            setShowMore((value) => !value);
+          }}
         >
           <MoreHorizontal size={22} aria-hidden="true" />
           <span>{t(language, "more")}</span>
         </button>
       </div>
+      <button
+        className="absolute -top-7 right-5 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-brand-500 to-cyan-400 text-2xl font-black text-slate-950 shadow-glow"
+        type="button"
+        aria-label={t(language, "addMenu")}
+        onClick={() => {
+          setShowMore(false);
+          setShowQuickAdd((value) => !value);
+        }}
+      >
+        +
+      </button>
     </nav>
   );
 }

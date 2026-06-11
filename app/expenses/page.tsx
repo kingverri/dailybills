@@ -165,7 +165,7 @@ export default function ExpensesPage() {
     <>
       <PageHeader
         eyebrow={t(language, "expenses").toUpperCase()}
-        title={t(language, "dailyExpenses")}
+        title={t(language, "expenses")}
         subtitle={t(language, "expensesSubtitle")}
         showBackToDashboard
         backToDashboardLabel={t(language, "backToDashboard")}
@@ -228,8 +228,29 @@ export default function ExpensesPage() {
             <button className="filter-pill" type="button" onClick={() => applyPreset(t(language, "gasPreset"), "gas")}>
               {t(language, "gasPreset")}
             </button>
+            <button className="filter-pill" type="button" onClick={() => applyPreset(t(language, "groceriesCategory"), "groceries")}>
+              {t(language, "groceriesCategory")}
+            </button>
+            <button className="filter-pill" type="button" onClick={() => applyPreset(t(language, "otherCategory"), "other")}>
+              {t(language, "otherCategory")}
+            </button>
           </div>
         </AppFilterBar>
+
+        {totalsByCategory.length > 0 ? (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {totalsByCategory.map((item) => (
+              <button
+                key={item.category}
+                className={`filter-pill shrink-0 ${categoryFilter === item.category ? "filter-pill-active" : ""}`}
+                type="button"
+                onClick={() => setCategoryFilter(item.category)}
+              >
+                {expenseCategoryLabel(language, item.category)} {formatCurrency(item.total, currency)}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <AppFilterBar>
           <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
@@ -264,26 +285,31 @@ export default function ExpensesPage() {
           ) : (
             filteredExpenses.map((expense) => (
               <AppListCard key={expense.id}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-lg font-black text-ink">{expense.merchant || expenseCategoryLabel(language, expense.category)}</p>
-                    <p className="text-sm font-medium text-neutral-600">{formatDate(expense.date, language)}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="badge badge-muted">{expenseCategoryLabel(language, expense.category)}</span>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span className="icon-chip-sm">
+                      <Receipt size={18} aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-black text-ink">{expense.merchant || expenseCategoryLabel(language, expense.category)}</p>
+                      <p className="text-sm font-medium text-neutral-600">
+                        {formatDate(expense.date, language)} • {expenseCategoryLabel(language, expense.category)}
+                      </p>
+                      {expense.notes ? <p className="mt-1 truncate text-sm text-neutral-600">{expense.notes}</p> : null}
                     </div>
-                    {expense.notes ? <p className="mt-2 text-sm text-neutral-600">{expense.notes}</p> : null}
                   </div>
-                  <p className="text-xl font-black text-ink">{formatCurrency(expense.amount, currency)}</p>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button className="btn-secondary" type="button" onClick={() => editExpense(expense)}>
-                    <Pencil size={17} aria-hidden="true" />
-                    {t(language, "edit")}
-                  </button>
-                  <button className="btn-danger" type="button" onClick={() => deleteExpense(expense.id)}>
-                    <Trash2 size={17} aria-hidden="true" />
-                    {t(language, "delete")}
-                  </button>
+                  <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <p className="text-lg font-black text-ink">{formatCurrency(expense.amount, currency)}</p>
+                    <div className="flex gap-1.5">
+                      <button className="btn-secondary min-h-9 px-2.5" type="button" onClick={() => editExpense(expense)}>
+                        <Pencil size={15} aria-hidden="true" />
+                        {t(language, "edit")}
+                      </button>
+                      <button className="btn-danger min-h-9 px-2.5" type="button" onClick={() => deleteExpense(expense.id)}>
+                        <Trash2 size={15} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </AppListCard>
             ))

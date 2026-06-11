@@ -119,6 +119,18 @@ export function AppFilterBar({ children, className }: { children: React.ReactNod
   return <div className={clsx("card app-filter-bar p-3", className)}>{children}</div>;
 }
 
-export function AppListCard({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <article className={clsx("card app-list-card p-4 transition hover:-translate-y-0.5", className)}>{children}</article>;
+export function AppListCard({
+  children,
+  className,
+  compact = true
+}: {
+  children: React.ReactNode;
+  className?: string;
+  compact?: boolean;
+}) {
+  return (
+    <article className={clsx("card app-list-card transition hover:-translate-y-0.5", compact ? "p-3 sm:p-3.5" : "p-4", className)}>
+      {children}
+    </article>
+  );
 }

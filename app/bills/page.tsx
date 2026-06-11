@@ -458,8 +458,8 @@ export default function BillsPage() {
     <>
       <PageHeader
         eyebrow={t(language, "bills")}
-        title={t(language, "upcomingObligations")}
-        subtitle={t(language, "billsSubtitle")}
+        title={t(language, "bills")}
+        subtitle={t(language, "billsPageSubtitle")}
         showBackToDashboard
         backToDashboardLabel={t(language, "backToDashboard")}
       >

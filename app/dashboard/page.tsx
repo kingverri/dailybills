@@ -44,6 +44,7 @@ import { useAuth } from "@/components/auth-provider";
 import { usePersistentDraft } from "@/hooks/use-persistent-draft";
 import {
   calculateCashFlowProjectionForPeriod,
+  calculateDriverLogMetrics,
   calculateProjectedBalanceAfterBills,
   calculateRiskLevelForPeriod,
   calculateShortfallForPeriod,
@@ -105,6 +106,11 @@ export default function DashboardPage() {
   const monthlyDriverLogCount = useMemo(() => getCurrentMonthDriverLogCount(driverLogs), [driverLogs]);
   const canCreateDriverLog = canAddDriverLog(currentPlan, monthlyDriverLogCount);
   const currentBalance = Number(profile?.current_balance ?? 0);
+  const todayValue = toDateInputValue(asOf);
+  const todayWorkLogs = useMemo(() => driverLogs.filter((log) => log.date === todayValue), [driverLogs, todayValue]);
+  const todayExpenses = useMemo(() => expenses.filter((expense) => expense.date === todayValue), [expenses, todayValue]);
+  const todayWorkNet = todayWorkLogs.reduce((sum, log) => sum + calculateDriverLogMetrics(log).netProfit, 0);
+  const todayExpenseTotal = todayExpenses.reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0);
   const projectionRange = useMemo(
     () =>
       projectionPeriod === "custom" && canUseCustomPeriod
@@ -382,6 +388,7 @@ export default function DashboardPage() {
         eyebrow={t(language, "dashboard")}
         title={t(language, "todayName", { name: profile?.full_name?.split(" ")[0] ?? t(language, "driver") })}
         subtitle={t(language, "dashboardSubtitle")}
+        variant="hero"
       >
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <button className="btn-primary" type="button" onClick={() => setShowQuickLogModal(true)}>
@@ -643,6 +650,41 @@ export default function DashboardPage() {
                 </div>
               ) : null}
             </div>
+          </section>
+
+          <section className="grid gap-3 md:grid-cols-2">
+            <button
+              className="card flex min-h-20 items-center justify-between gap-3 p-4 text-left hover:border-brand-200"
+              type="button"
+              onClick={() => setShowQuickLogModal(true)}
+            >
+              <span>
+                <span className="block text-sm font-black text-ink">
+                  {todayWorkLogs.length > 0 ? t(language, "todayWorkLogged") : t(language, "logTodaysWork")}
+                </span>
+                <span className="mt-1 block text-sm font-semibold text-neutral-600">
+                  {todayWorkLogs.length > 0
+                    ? `${todayWorkLogs.length} ${t(language, "entries")} • ${formatCurrency(todayWorkNet, currency)}`
+                    : t(language, "noWorkLoggedToday")}
+                </span>
+              </span>
+              <span className="btn-primary min-h-10 px-3">{t(language, "logWork")}</span>
+            </button>
+            <button
+              className="card flex min-h-20 items-center justify-between gap-3 p-4 text-left hover:border-brand-200"
+              type="button"
+              onClick={() => setShowQuickExpenseModal(true)}
+            >
+              <span>
+                <span className="block text-sm font-black text-ink">{t(language, "quickExpense")}</span>
+                <span className="mt-1 block text-sm font-semibold text-neutral-600">
+                  {todayExpenses.length > 0
+                    ? `${todayExpenses.length} ${t(language, "expenses")} • ${formatCurrency(todayExpenseTotal, currency)}`
+                    : t(language, "noExpenseToday")}
+                </span>
+              </span>
+              <span className="btn-secondary min-h-10 px-3">{t(language, "addExpense")}</span>
+            </button>
           </section>
 
           {dashboard.overdueTotal > 0 ? (

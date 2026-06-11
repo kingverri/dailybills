@@ -133,6 +133,25 @@ export default function DriverLogPage() {
     () => calculateWeeklyDriverSummaryForRange(logs, currentWeekRange),
     [currentWeekRange, logs]
   );
+  const todayValue = toDateInputValue();
+  const todayLogs = useMemo(() => logs.filter((log) => log.date === todayValue), [logs, todayValue]);
+  const todaySummary = useMemo(
+    () =>
+      todayLogs.reduce(
+        (summary, log) => {
+          const metrics = calculateDriverLogMetrics(log);
+          return {
+            gross: summary.gross + Number(log.gross_earnings ?? 0),
+            tips: summary.tips + Number(log.tips_received ?? 0),
+            hours: summary.hours + metrics.hoursWorked,
+            expenses: summary.expenses + Number(log.gas_spent ?? 0) + Number(log.extra_expenses ?? 0),
+            net: summary.net + metrics.netProfit
+          };
+        },
+        { gross: 0, tips: 0, hours: 0, expenses: 0, net: 0 }
+      ),
+    [todayLogs]
+  );
   const previousWeekSummary = useMemo(
     () => calculateWeeklyDriverSummaryForRange(logs, previousWeekRange),
     [logs, previousWeekRange]
@@ -352,6 +371,29 @@ export default function DriverLogPage() {
           />
         </AppActionPanel>
 
+        <section className="card p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-black text-ink">{todayLogs.length > 0 ? t(language, "todayWorkLogged") : t(language, "noWorkLoggedToday")}</p>
+              <p className="mt-1 text-sm font-semibold text-neutral-600">{formatDate(todayValue, language)}</p>
+            </div>
+            {todayLogs.length === 0 ? (
+              <button className="btn-primary" type="button" onClick={() => setShowForm(true)}>
+                <Plus size={17} aria-hidden="true" />
+                {t(language, "logNow")}
+              </button>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
+                <Metric icon={DollarSign} label={t(language, "gross")} value={formatCurrency(todaySummary.gross, currency)} />
+                <Metric icon={HandCoins} label={t(language, "totalTips")} value={formatCurrency(todaySummary.tips, currency)} />
+                <Metric icon={Clock3} label={t(language, "hours")} value={formatDurationFromDecimalHours(todaySummary.hours)} />
+                <Metric icon={Receipt} label={t(language, "expenses")} value={formatCurrency(todaySummary.expenses, currency)} />
+                <Metric icon={Receipt} label={t(language, "netProfit")} value={formatCurrency(todaySummary.net, currency)} />
+              </div>
+            )}
+          </div>
+        </section>
+
         <WeeklySummaryCard
           title={t(language, "currentWeekSummary")}
           summary={currentWeekSummary}
@@ -505,7 +547,7 @@ function WeeklySummaryCard({
           {viewDetailsLabel}
         </button>
       </div>
-      <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-6">
+      <div className="grid auto-cols-[minmax(135px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-1 text-sm sm:grid-flow-row sm:grid-cols-3 lg:grid-cols-6">
         <Metric icon={DollarSign} label={t(language, "totalGrossEarnings")} value={formatCurrency(summary.totalGrossEarnings, currency)} />
         <Metric icon={HandCoins} label={t(language, "totalTips")} value={formatCurrency(summary.totalTipsReceived, currency)} />
         <Metric icon={DollarSign} label={t(language, "totalEarnings")} value={formatCurrency(summary.totalEarnings, currency)} />
@@ -519,7 +561,7 @@ function WeeklySummaryCard({
           {showFull ? <ChevronUp size={17} aria-hidden="true" /> : <ChevronDown size={17} aria-hidden="true" />}
         </button>
         {showFull ? (
-          <div className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+          <div className="mt-3 grid auto-cols-[minmax(135px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-1 text-sm sm:grid-flow-row sm:grid-cols-3 lg:grid-cols-4">
             <Metric icon={Route} label={t(language, "totalMiles")} value={summary.totalMiles.toFixed(1)} />
             <Metric icon={Receipt} label={t(language, "totalGasSpent")} value={formatCurrency(summary.totalGasSpent, currency)} />
             <Metric icon={DollarSign} label={t(language, "averageGasPrice")} value={formatCurrency(summary.averageGasPricePaid, currency)} />

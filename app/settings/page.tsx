@@ -454,8 +454,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="rounded-[1.35rem] border border-line bg-neutral-50/60 p-4">
-            <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "personalInfo")}</p>
+          <SettingsSection title={t(language, "personalInfo")}>
           <label className="block space-y-2">
             <span className="field-label">{t(language, "fullName")}</span>
             <input className="field" value={profileForm.full_name} onChange={(event) => setProfileForm({ ...profileForm, full_name: event.target.value })} />
@@ -465,10 +464,9 @@ export default function SettingsPage() {
             <span className="field-label">{t(language, "currentCashBalance")}</span>
             <input className="field" inputMode="decimal" value={profileForm.current_balance} onChange={(event) => setProfileForm({ ...profileForm, current_balance: event.target.value })} />
           </label>
-          </div>
+          </SettingsSection>
 
-          <div className="rounded-[1.35rem] border border-line bg-neutral-50/60 p-4">
-            <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "workProfile")}</p>
+          <SettingsSection title={t(language, "workProfile")} defaultOpen>
             <label className="block space-y-2">
               <span className="field-label">{t(language, "mainIncomeType")}</span>
               <select className="field" value={profileForm.income_type} onChange={(event) => setProfileForm({ ...profileForm, income_type: event.target.value as IncomeType })}>
@@ -548,10 +546,9 @@ export default function SettingsPage() {
                 ))}
               </select>
             </label>
-          </div>
+          </SettingsSection>
 
-          <div className="rounded-[1.35rem] border border-line bg-neutral-50/60 p-4">
-            <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "location")}</p>
+          <SettingsSection title={t(language, "location")}>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-2">
               <span className="field-label">{t(language, "currency")}</span>
@@ -577,10 +574,9 @@ export default function SettingsPage() {
               <input className="field" value={profileForm.city} onChange={(event) => setProfileForm({ ...profileForm, city: event.target.value })} />
             </label>
           </div>
-          </div>
+          </SettingsSection>
 
-          <div className="rounded-[1.35rem] border border-line bg-neutral-50/60 p-4">
-            <p className="mb-3 text-sm font-black uppercase tracking-wide text-neutral-500">{t(language, "appPreferences")}</p>
+          <SettingsSection title={t(language, "appPreferences")}>
           <label className="block space-y-2">
             <span className="field-label">{t(language, "language")}</span>
             <select
@@ -608,7 +604,7 @@ export default function SettingsPage() {
               <option value="light">{t(language, "lightTheme")}</option>
             </select>
           </label>
-          </div>
+          </SettingsSection>
 
           <div className="flex flex-wrap gap-2">
             <button className="btn-primary flex-1" type="submit" disabled={savingProfile}>
@@ -825,4 +821,26 @@ function describeSchedule(schedule: PaySchedule, language: Language) {
   return schedule.next_payment_date
     ? t(language, "customPaymentOn", { date: formatDate(schedule.next_payment_date, language) })
     : t(language, "customSchedule");
+}
+
+function SettingsSection({
+  title,
+  defaultOpen = false,
+  children
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="rounded-[1.25rem] border border-line bg-neutral-50/60 p-4" open={defaultOpen}>
+      <summary className="cursor-pointer list-none text-sm font-black text-ink">
+        <span className="flex items-center justify-between gap-3">
+          {title}
+          <span className="text-xs font-bold text-brand-700">+</span>
+        </span>
+      </summary>
+      <div className="mt-4 space-y-3">{children}</div>
+    </details>
+  );
 }

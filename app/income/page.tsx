@@ -8,10 +8,8 @@ import {
   ChevronUp,
   Clock3,
   DollarSign,
-  Fuel,
   Pencil,
   Plus,
-  Route,
   Trash2,
   TrendingUp
 } from "lucide-react";
@@ -146,26 +144,25 @@ export default function IncomePage() {
       ),
     [entries, selectedMonthRange.endExclusive, selectedMonthRange.startDate]
   );
-  const monthSummary = useMemo(
-    () =>
-      monthlyEntries.reduce(
-        (summary, entry) => ({
-          gross: summary.gross + entry.gross_earnings,
-          net: summary.net + entry.net_profit,
-          miles: summary.miles + entry.miles_driven,
-          hours: summary.hours + entry.hours_worked,
-          gas: summary.gas + entry.gas_spent,
-          extra: summary.extra + Number((entry as { extra_expenses?: number | null }).extra_expenses ?? 0),
-          count: summary.count + 1
-        }),
-        { gross: 0, net: 0, miles: 0, hours: 0, gas: 0, extra: 0, count: 0 }
-      ),
-    [monthlyEntries]
-  );
   const filteredEntries = useMemo(
     () => monthlyEntries.filter((entry) => filter === "all" || entry.income_entry_type === filter),
     [filter, monthlyEntries]
   );
+  const paymentSummary = useMemo(() => {
+    const confirmedEntries = monthlyEntries.filter((entry) => entry.income_entry_type === "confirmed");
+    const nextConfirmed = [...confirmedEntries].sort((first, second) => first.date.localeCompare(second.date))[0];
+
+    return {
+      received: monthlyEntries
+        .filter((entry) => entry.income_entry_type === "actual")
+        .reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0),
+      pending: confirmedEntries.reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0),
+      extras: monthlyEntries
+        .filter((entry) => entry.income_entry_type === "extra_gig")
+        .reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0),
+      nextPayment: nextConfirmed
+    };
+  }, [monthlyEntries]);
 
   async function loadData() {
     if (!user) {
@@ -364,14 +361,17 @@ export default function IncomePage() {
               }}
             />
           </label>
-          <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <AppMetricCard compact icon={DollarSign} label={t(language, "totalGross")} value={formatCurrency(monthSummary.gross, currency)} tone="cyan" />
-            <AppMetricCard compact icon={TrendingUp} label={t(language, "netProfit")} value={formatCurrency(monthSummary.net, currency)} tone="green" />
-            <AppMetricCard compact icon={Route} label={t(language, "miles")} value={monthSummary.miles.toFixed(1)} tone="purple" />
-            <AppMetricCard compact icon={Clock3} label={t(language, "hours")} value={formatDurationFromDecimalHours(monthSummary.hours)} tone="amber" />
-            <AppMetricCard compact icon={Fuel} label={t(language, "gasSpent")} value={formatCurrency(monthSummary.gas, currency)} tone="amber" />
-            <AppMetricCard compact icon={BarChart3} label={t(language, "extraExpenses")} value={formatCurrency(monthSummary.extra, currency)} tone="red" />
-            <AppMetricCard compact icon={BarChart3} label={t(language, "entries")} value={monthSummary.count} tone="neutral" />
+          <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+            <AppMetricCard compact icon={DollarSign} label={t(language, "receivedThisMonth")} value={formatCurrency(paymentSummary.received, currency)} tone="green" />
+            <AppMetricCard compact icon={Clock3} label={t(language, "pendingPayments")} value={formatCurrency(paymentSummary.pending, currency)} tone="amber" />
+            <AppMetricCard
+              compact
+              icon={BarChart3}
+              label={t(language, "nextPayment")}
+              value={paymentSummary.nextPayment ? `${paymentSummary.nextPayment.platform} ${formatDate(paymentSummary.nextPayment.date, language)}` : "-"}
+              tone="cyan"
+            />
+            <AppMetricCard compact icon={TrendingUp} label={t(language, "extraIncomeFilter")} value={formatCurrency(paymentSummary.extras, currency)} tone="purple" />
           </div>
         </section>
 
@@ -545,13 +545,13 @@ export default function IncomePage() {
 
               return (
               <AppListCard key={entry.id}>
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-start gap-3">
-                    <span className={`icon-chip ${incomeTypeBadgeClass(entry.income_entry_type)}`}>
-                      <DollarSign size={24} aria-hidden="true" />
+                    <span className={`icon-chip-sm ${incomeTypeBadgeClass(entry.income_entry_type)}`}>
+                      <DollarSign size={18} aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
-                    <p className="text-lg font-black text-ink">{entry.platform}</p>
+                    <p className="text-base font-black text-ink">{entry.platform}</p>
                     <p className="text-sm font-medium text-neutral-600">
                       {formatDate(entry.date, language)}
                     </p>
@@ -560,21 +560,18 @@ export default function IncomePage() {
                     </span>
                     </div>
                   </div>
-                  <p className="text-xl font-black text-ink">{formatCurrency(entry.net_profit, currency)}</p>
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
-                  <p className="metric-card p-2">
-                    <span className="flex items-center gap-1 text-neutral-500"><DollarSign size={13} aria-hidden="true" />{t(language, "gross")}</span>
-                    <span className="font-semibold">{formatCurrency(entry.gross_earnings, currency)}</span>
-                  </p>
-                  <p className="metric-card p-2">
-                    <span className="flex items-center gap-1 text-neutral-500"><Route size={13} aria-hidden="true" />{t(language, "miles")}</span>
-                    <span className="font-semibold">{entry.miles_driven}</span>
-                  </p>
-                  <p className="metric-card p-2">
-                    <span className="flex items-center gap-1 text-neutral-500"><TrendingUp size={13} aria-hidden="true" />{t(language, "netProfit")}</span>
-                    <span className="font-semibold">{formatCurrency(entry.net_profit, currency)}</span>
-                  </p>
+                  <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <p className="text-xl font-black text-ink">{formatCurrency(entry.gross_earnings, currency)}</p>
+                    <div className="flex gap-1.5">
+                      <button className="btn-secondary min-h-9 px-2.5" type="button" onClick={() => editEntry(entry)}>
+                        <Pencil size={15} aria-hidden="true" />
+                        {t(language, "edit")}
+                      </button>
+                      <button className="btn-danger min-h-9 px-2.5" type="button" onClick={() => deleteEntry(entry.id)}>
+                        <Trash2 size={15} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <button
                   className="mt-3 flex w-full items-center justify-between gap-3 border-t border-line pt-3 text-left text-sm font-semibold text-brand-700"
@@ -625,16 +622,6 @@ export default function IncomePage() {
                   {entry.notes ? <p className="col-span-full text-sm text-neutral-600">{entry.notes}</p> : null}
                 </div>
                 ) : null}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button className="btn-secondary" type="button" onClick={() => editEntry(entry)}>
-                    <Pencil size={17} aria-hidden="true" />
-                    {t(language, "edit")}
-                  </button>
-                  <button className="btn-danger" type="button" onClick={() => deleteEntry(entry.id)}>
-                    <Trash2 size={17} aria-hidden="true" />
-                    {t(language, "delete")}
-                  </button>
-                </div>
               </AppListCard>
               );
             })
