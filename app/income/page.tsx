@@ -310,15 +310,15 @@ export default function IncomePage() {
   return (
     <>
       <PageHeader
-        eyebrow={t(language, "income")}
-        title={t(language, "trackEachDrivingDay")}
-        subtitle={t(language, "incomeSubtitle")}
+        eyebrow={t(language, "paymentsEyebrow")}
+        title={t(language, "paymentsTitle")}
+        subtitle={t(language, "paymentsSubtitle")}
         showBackToDashboard
         backToDashboardLabel={t(language, "backToDashboard")}
       >
         <button className="btn-primary" type="button" onClick={() => setShowForm(true)}>
           <Plus size={18} aria-hidden="true" />
-          {t(language, "addIncome")}
+          {t(language, "addPayment")}
         </button>
       </PageHeader>
 
@@ -327,7 +327,7 @@ export default function IncomePage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-2">
               <p className="field-label">{t(language, "selectedMonth")}</p>
-              <p className="text-2xl font-black capitalize text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
+              <p className="text-2xl font-black text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -377,7 +377,7 @@ export default function IncomePage() {
 
         <AppSectionCard
           icon={BarChart3}
-          title={t(language, "exportIncome")}
+          title={t(language, "exportPayments")}
           subtitle={`${t(language, "selectedMonth")}: ${formatSelectedMonth(selectedMonth, language)}`}
         >
           {exportError ? <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{exportError}</p> : null}
@@ -396,7 +396,7 @@ export default function IncomePage() {
 
         <AppActionPanel
           icon={Plus}
-          title={editingId ? t(language, "editIncome") : t(language, "addIncome")}
+          title={editingId ? t(language, "editIncome") : t(language, "addPayment")}
           subtitle={t(language, "noIncomeHelper")}
           expanded={showForm}
           onToggle={() => setShowForm((value) => !value)}
@@ -495,7 +495,7 @@ export default function IncomePage() {
           <div className="flex flex-wrap gap-2">
             <button className="btn-primary flex-1" type="submit" disabled={saving}>
               <Plus size={18} aria-hidden="true" />
-              {saving ? t(language, "saving") : editingId ? t(language, "saveIncome") : t(language, "addIncome")}
+              {saving ? t(language, "saving") : editingId ? t(language, "saveIncome") : t(language, "addPayment")}
             </button>
             {editingId ? (
               <button className="btn-secondary" type="button" onClick={resetForm}>
@@ -536,7 +536,7 @@ export default function IncomePage() {
             <EmptyState icon={BarChart3} title={t(language, "noIncomeEntriesFoundForMonth")} body={t(language, "noIncomeHelper")}>
               <button className="btn-primary" type="button" onClick={() => setShowForm(true)}>
                 <Plus size={17} aria-hidden="true" />
-                {t(language, "addIncome")}
+                {t(language, "addPayment")}
               </button>
             </EmptyState>
           ) : (

@@ -61,6 +61,14 @@ export default function ExpensesPage() {
         .reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0)
     }))
     .filter((item) => item.total > 0);
+  const biggestCategory = [...totalsByCategory].sort((first, second) => second.total - first.total)[0];
+  const biggestExpense = [...monthlyExpenses].sort((first, second) => Number(second.amount ?? 0) - Number(first.amount ?? 0))[0];
+  const [selectedYear, selectedMonthNumber] = selectedMonth.split("-").map(Number);
+  const daysInSelectedMonth = new Date(selectedYear, selectedMonthNumber, 0).getDate();
+  const today = new Date();
+  const currentMonth = currentMonthValue();
+  const elapsedDays = selectedMonth === currentMonth ? today.getDate() : daysInSelectedMonth;
+  const dailyAverage = monthlyTotal / Math.max(1, elapsedDays);
 
   async function loadExpenses() {
     if (!user) {
@@ -100,6 +108,11 @@ export default function ExpensesPage() {
     setForm(createExpenseForm(expense));
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function applyPreset(merchant: string, category: ExpenseCategory) {
+    setForm({ ...form, merchant, category });
+    setShowForm(true);
   }
 
   async function saveExpense(event: React.FormEvent<HTMLFormElement>) {
@@ -186,17 +199,37 @@ export default function ExpensesPage() {
         </AppActionPanel>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <AppMetricCard icon={Receipt} label={t(language, "monthlyTotal")} value={formatCurrency(monthlyTotal, currency)} tone="amber" />
+          <AppMetricCard icon={Receipt} label={t(language, "monthlyExpenses")} value={formatCurrency(monthlyTotal, currency)} tone="amber" />
           <AppMetricCard label={t(language, "selectedMonth")} value={formatMonthYear(`${selectedMonth}-01`, language)} />
-          {totalsByCategory.slice(0, 2).map((item) => (
-            <AppMetricCard
-              key={item.category}
-              label={expenseCategoryLabel(language, item.category)}
-              value={formatCurrency(item.total, currency)}
-              compact
-            />
-          ))}
+          <AppMetricCard
+            label={t(language, "biggestCategory")}
+            value={biggestCategory ? `${expenseCategoryLabel(language, biggestCategory.category)} ${formatCurrency(biggestCategory.total, currency)}` : "-"}
+            compact
+          />
+          <AppMetricCard
+            label={t(language, "dailyAverage")}
+            value={formatCurrency(dailyAverage, currency)}
+            compact
+          />
+          <AppMetricCard
+            label={t(language, "biggestExpense")}
+            value={biggestExpense ? `${biggestExpense.merchant || expenseCategoryLabel(language, biggestExpense.category)} ${formatCurrency(biggestExpense.amount, currency)}` : "-"}
+            compact
+          />
         </div>
+
+        <AppFilterBar>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <button className="filter-pill" type="button" onClick={() => applyPreset("Walmart", "groceries")}>Walmart</button>
+            <button className="filter-pill" type="button" onClick={() => applyPreset("Amazon", "amazon_online")}>Amazon</button>
+            <button className="filter-pill" type="button" onClick={() => applyPreset(t(language, "fastFoodPreset"), "restaurant_fast_food")}>
+              {t(language, "fastFoodPreset")}
+            </button>
+            <button className="filter-pill" type="button" onClick={() => applyPreset(t(language, "gasPreset"), "gas")}>
+              {t(language, "gasPreset")}
+            </button>
+          </div>
+        </AppFilterBar>
 
         <AppFilterBar>
           <div className="grid gap-3 sm:grid-cols-[180px_1fr]">

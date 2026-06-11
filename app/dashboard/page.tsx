@@ -84,6 +84,7 @@ export default function DashboardPage() {
   const [showQuickLogModal, setShowQuickLogModal] = useState(false);
   const [savingQuickLog, setSavingQuickLog] = useState(false);
   const [quickLogMessage, setQuickLogMessage] = useState("");
+  const [showAddMenu, setShowAddMenu] = useState(false);
   const [asOf] = useState(() => new Date());
   const [projectionPeriod, setProjectionPeriod] = useState<ProjectionPeriod>("this_month");
   const [customStartDate, setCustomStartDate] = useState(() => toDateInputValue(new Date()));
@@ -382,23 +383,41 @@ export default function DashboardPage() {
         title={t(language, "todayName", { name: profile?.full_name?.split(" ")[0] ?? t(language, "driver") })}
         subtitle={t(language, "dashboardSubtitle")}
       >
-        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:flex xl:w-auto">
-          <Link className="btn-secondary" href="/bills">
-            <Plus size={18} aria-hidden="true" />
-            {t(language, "addBill")}
-          </Link>
-          <Link className="btn-primary" href="/income">
-            <Plus size={18} aria-hidden="true" />
-            {t(language, "addIncome")}
-          </Link>
-          <button className="btn-secondary" type="button" onClick={() => setShowQuickExpenseModal(true)}>
-            <Plus size={18} aria-hidden="true" />
-            {t(language, "addExpense")}
-          </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <button className="btn-primary" type="button" onClick={() => setShowQuickLogModal(true)}>
             <Plus size={18} aria-hidden="true" />
             {t(language, "logWork")}
           </button>
+          <div className="relative">
+            <button className="btn-secondary w-full sm:w-auto" type="button" onClick={() => setShowAddMenu((value) => !value)}>
+            <Plus size={18} aria-hidden="true" />
+              {t(language, "addMenu")}
+              {showAddMenu ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+            </button>
+            {showAddMenu ? (
+              <div className="absolute right-0 z-30 mt-2 w-full min-w-56 rounded-2xl border border-line bg-surface p-2 shadow-card sm:w-64">
+                <Link className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:text-ink" href="/bills">
+                  <Receipt size={17} aria-hidden="true" />
+                  {t(language, "bill")}
+                </Link>
+                <button
+                  className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:text-ink"
+                  type="button"
+                  onClick={() => {
+                    setShowAddMenu(false);
+                    setShowQuickExpenseModal(true);
+                  }}
+                >
+                  <Wallet size={17} aria-hidden="true" />
+                  {t(language, "expense")}
+                </button>
+                <Link className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-bold text-neutral-600 hover:bg-neutral-50 hover:text-ink" href="/income">
+                  <BarChart3 size={17} aria-hidden="true" />
+                  {t(language, "payment")}
+                </Link>
+              </div>
+            ) : null}
+          </div>
         </div>
       </PageHeader>
 
@@ -504,21 +523,13 @@ export default function DashboardPage() {
 
               <div className="relative mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <DashboardMetric
-                  icon={Receipt}
-                  label={t(language, "billsInPeriod")}
-                  value={formatCurrency(dashboard.includedBillsTotal, currency)}
+                  icon={hasShortfall ? AlertTriangle : CheckCircle2}
+                  label={periodResultLabel}
+                  value={formatCurrency(hasShortfall ? periodResultValue : 0, currency)}
                   helper={`${projectionPeriodLabel(language, dashboard.cashFlow.period)} · ${formatDate(dashboard.cashFlow.startDate, language)} - ${formatDate(
                     dashboard.cashFlow.endDate,
                     language
                   )}`}
-                  tone="cyan"
-                  inverted
-                />
-                <DashboardMetric
-                  icon={hasShortfall ? AlertTriangle : CheckCircle2}
-                  label={periodResultLabel}
-                  value={formatCurrency(periodResultValue, currency)}
-                  helper={hasShortfall ? t(language, "amountNeededToCoverBills") : t(language, "afterBillsSelectedPeriod")}
                   tone={hasShortfall ? "danger" : "good"}
                   inverted
                 />
@@ -528,6 +539,14 @@ export default function DashboardPage() {
                   value={`${formatCurrency(suggestedDailyTarget, currency)}/${t(language, "dayShort")}`}
                   helper={t(language, "toCoverBillsBy", { endDate: periodEndDate })}
                   tone={hasShortfall ? "warn" : "neutral"}
+                  inverted
+                />
+                <DashboardMetric
+                  icon={AlertTriangle}
+                  label={t(language, "overdueBills")}
+                  value={formatCurrency(dashboard.overdueTotal, currency)}
+                  helper={dashboard.overdueTotal > 0 ? t(language, "includesOverdueUnpaid") : t(language, "noOverdueBills")}
+                  tone={dashboard.overdueTotal > 0 ? "danger" : "good"}
                   inverted
                 />
                 <DashboardMetric

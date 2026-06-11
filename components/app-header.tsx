@@ -9,10 +9,10 @@ import { t, type TranslationKey } from "@/lib/i18n";
 
 const navItems: { href: string; labelKey: TranslationKey; icon: typeof Home }[] = [
   { href: "/dashboard", labelKey: "dashboard", icon: Home },
-  { href: "/bills", labelKey: "bills", icon: CircleDollarSign },
-  { href: "/income", labelKey: "income", icon: BarChart3 },
-  { href: "/expenses", labelKey: "expenses", icon: Receipt },
   { href: "/driver-log", labelKey: "driverLogNav", icon: ClipboardList },
+  { href: "/bills", labelKey: "bills", icon: CircleDollarSign },
+  { href: "/expenses", labelKey: "expenses", icon: Receipt },
+  { href: "/income", labelKey: "income", icon: BarChart3 },
   { href: "/settings", labelKey: "settings", icon: Settings }
 ];
 

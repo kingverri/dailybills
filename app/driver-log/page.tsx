@@ -302,8 +302,8 @@ export default function DriverLogPage() {
     <>
       <PageHeader
         eyebrow={t(language, "driverLog")}
-        title={t(language, "weeklyWorkSummary")}
-        subtitle={t(language, "driverLogSubtitle")}
+        title={t(language, "logTodaysWork")}
+        subtitle={t(language, "workPageSubtitle")}
         showBackToDashboard
         backToDashboardLabel={t(language, "backToDashboard")}
       >
@@ -318,66 +318,39 @@ export default function DriverLogPage() {
       {loading ? <div className="card mb-4 p-4 text-sm text-neutral-600">{t(language, "loading")}</div> : null}
 
       <div className="space-y-5">
-        <AppSectionCard icon={CalendarDays} title={t(language, "weeklySettlementDay")} subtitle={t(language, "weeklySettlementProMessage")}>
-          <label className="block space-y-2">
-            <span className="field-label">{t(language, "weeklySettlementDay")}</span>
-            <select
-              className="field"
-              value={settlementDay}
-              disabled={savingSettlement || !canChangeSettlementDay}
-              onChange={(event) => saveSettlementDay(event.target.value as WeeklySettlementDay).catch(console.error)}
-            >
-              {weeklySettlementDays.map((day) => (
-                <option key={day} value={day}>
-                  {settlementDayLabel(language, day)}
-                </option>
-              ))}
-            </select>
-            {!canChangeSettlementDay ? (
-              <span className="block text-sm text-neutral-600">
-                {t(language, "weeklySettlementProMessage")}{" "}
-                <Link className="font-semibold text-brand-700" href="/pricing">
-                  {t(language, "upgrade")}
+        <AppActionPanel
+          icon={Plus}
+          title={editingId ? t(language, "editDailyLog") : t(language, "addDailyLog")}
+          subtitle={t(language, "noDailyRecordsHelper")}
+          expanded={showForm}
+          onToggle={() => setShowForm((value) => !value)}
+        >
+          <WorkRecordForm
+            currency={currency}
+            form={form}
+            language={language}
+            profile={profile}
+            saving={saving}
+            setForm={setForm}
+            submitLabel={t(language, "saveLog")}
+            onCancel={resetForm}
+            onSubmit={handleSubmit}
+            footer={
+              !editingId && !canCreateDriverLog ? (
+                <div className="rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-brand-800">
+                  <p>{t(language, "freeDriverLogLimitMessage")}</p>
+                  <Link className="btn-primary mt-3" href="/pricing">
+                    {t(language, "upgrade")}
+                  </Link>
+                </div>
+              ) : (
+                <Link className="btn-secondary w-full" href="/dashboard">
+                  {t(language, "backToDashboard")}
                 </Link>
-              </span>
-            ) : null}
-          </label>
-        </AppSectionCard>
-
-        <AppSectionCard icon={ClipboardList} title={t(language, "exportDriverLogs")} subtitle={t(language, "driverLogSubtitle")}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block space-y-2">
-              <span className="field-label">{t(language, "startDate")}</span>
-              <input
-                className="field"
-                type="date"
-                value={exportStartDate}
-                onChange={(event) => setExportStartDate(event.target.value)}
-              />
-            </label>
-            <label className="block space-y-2">
-              <span className="field-label">{t(language, "endDate")}</span>
-              <input
-                className="field"
-                type="date"
-                value={exportEndDate}
-                onChange={(event) => setExportEndDate(event.target.value)}
-              />
-            </label>
-          </div>
-          {exportError ? <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{exportError}</p> : null}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button className="btn-secondary" type="button" onClick={() => handleExport("csv")}>
-              {t(language, "exportCsv")}
-            </button>
-            <button className="btn-secondary" type="button" onClick={() => handleExport("xlsx")}>
-              {t(language, "exportExcel")}
-            </button>
-            <button className="btn-secondary" type="button" onClick={() => handleExport("google")}>
-              {t(language, "exportGoogleSheets")}
-            </button>
-          </div>
-        </AppSectionCard>
+              )
+            }
+          />
+        </AppActionPanel>
 
         <WeeklySummaryCard
           title={t(language, "currentWeekSummary")}
@@ -426,39 +399,67 @@ export default function DriverLogPage() {
           />
         ) : null}
 
-        <AppActionPanel
-          icon={Plus}
-          title={editingId ? t(language, "editDailyLog") : t(language, "addDailyLog")}
-          subtitle={t(language, "noDailyRecordsHelper")}
-          expanded={showForm}
-          onToggle={() => setShowForm((value) => !value)}
-        >
-          <WorkRecordForm
-            currency={currency}
-            form={form}
-            language={language}
-            profile={profile}
-            saving={saving}
-            setForm={setForm}
-            submitLabel={t(language, "saveLog")}
-            onCancel={resetForm}
-            onSubmit={handleSubmit}
-            footer={
-              !editingId && !canCreateDriverLog ? (
-                <div className="rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-brand-800">
-                  <p>{t(language, "freeDriverLogLimitMessage")}</p>
-                  <Link className="btn-primary mt-3" href="/pricing">
-                    {t(language, "upgrade")}
-                  </Link>
-                </div>
-              ) : (
-                <Link className="btn-secondary w-full" href="/dashboard">
-                  {t(language, "backToDashboard")}
+        <AppSectionCard icon={ClipboardList} title={t(language, "exportDriverLogs")} subtitle={t(language, "driverLogSubtitle")}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-2">
+              <span className="field-label">{t(language, "startDate")}</span>
+              <input
+                className="field"
+                type="date"
+                value={exportStartDate}
+                onChange={(event) => setExportStartDate(event.target.value)}
+              />
+            </label>
+            <label className="block space-y-2">
+              <span className="field-label">{t(language, "endDate")}</span>
+              <input
+                className="field"
+                type="date"
+                value={exportEndDate}
+                onChange={(event) => setExportEndDate(event.target.value)}
+              />
+            </label>
+          </div>
+          {exportError ? <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{exportError}</p> : null}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button className="btn-secondary" type="button" onClick={() => handleExport("csv")}>
+              {t(language, "exportCsv")}
+            </button>
+            <button className="btn-secondary" type="button" onClick={() => handleExport("xlsx")}>
+              {t(language, "exportExcel")}
+            </button>
+            <button className="btn-secondary" type="button" onClick={() => handleExport("google")}>
+              {t(language, "exportGoogleSheets")}
+            </button>
+          </div>
+        </AppSectionCard>
+
+        <AppSectionCard icon={CalendarDays} title={t(language, "weeklySettlementDay")} subtitle={t(language, "weeklySettlementProMessage")}>
+          <label className="block space-y-2">
+            <span className="field-label">{t(language, "weeklySettlementDay")}</span>
+            <select
+              className="field"
+              value={settlementDay}
+              disabled={savingSettlement || !canChangeSettlementDay}
+              onChange={(event) => saveSettlementDay(event.target.value as WeeklySettlementDay).catch(console.error)}
+            >
+              {weeklySettlementDays.map((day) => (
+                <option key={day} value={day}>
+                  {settlementDayLabel(language, day)}
+                </option>
+              ))}
+            </select>
+            {!canChangeSettlementDay ? (
+              <span className="block text-sm text-neutral-600">
+                {t(language, "weeklySettlementProMessage")}{" "}
+                <Link className="font-semibold text-brand-700" href="/pricing">
+                  {t(language, "upgrade")}
                 </Link>
-              )
-            }
-          />
-        </AppActionPanel>
+              </span>
+            ) : null}
+          </label>
+        </AppSectionCard>
+
       </div>
     </>
   );

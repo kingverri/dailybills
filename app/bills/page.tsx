@@ -261,6 +261,32 @@ export default function BillsPage() {
         return a.occurrenceDate.localeCompare(b.occurrenceDate);
       });
   }, [filter, monthlyBillOccurrences, sortBy, todayValue]);
+  const groupedBillSections = useMemo(
+    () =>
+      [
+        {
+          key: "overdue" as const,
+          title: t(language, "overdue"),
+          bills: sortedBills.filter((bill) => bill.status !== "paid" && bill.occurrenceDate < todayValue)
+        },
+        {
+          key: "today" as const,
+          title: t(language, "today"),
+          bills: sortedBills.filter((bill) => bill.status !== "paid" && bill.occurrenceDate === todayValue)
+        },
+        {
+          key: "upcoming" as const,
+          title: t(language, "upcoming"),
+          bills: sortedBills.filter((bill) => bill.status !== "paid" && bill.occurrenceDate > todayValue)
+        },
+        {
+          key: "paid" as const,
+          title: t(language, "paid"),
+          bills: sortedBills.filter((bill) => bill.status === "paid")
+        }
+      ].filter((section) => section.bills.length > 0),
+    [language, sortedBills, todayValue]
+  );
 
   async function loadBills() {
     if (!user) {
@@ -596,7 +622,7 @@ export default function BillsPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-2">
               <p className="field-label">{t(language, "selectedMonth")}</p>
-              <p className="text-2xl font-black capitalize text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
+              <p className="text-2xl font-black text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -676,64 +702,67 @@ export default function BillsPage() {
               </button>
             </EmptyState>
           ) : (
-            sortedBills.map((bill: BillOccurrence) => {
-              const CategoryIcon = billCategoryIcon(bill.category);
-              const status = billStatusBadge(bill, todayValue, language);
-              const StatusIcon = status.icon;
+            groupedBillSections.map((section) => (
+              <div key={section.key} className="space-y-2">
+                <h2 className="px-1 text-sm font-black uppercase tracking-wide text-neutral-500">{section.title}</h2>
+                {section.bills.map((bill: BillOccurrence) => {
+                  const CategoryIcon = billCategoryIcon(bill.category);
+                  const status = billStatusBadge(bill, todayValue, language);
+                  const StatusIcon = status.icon;
 
-              return (
-              <AppListCard
-                key={`${bill.id}:${bill.occurrenceDate}`}
-                className={`border-l-4 ${billCategoryTone(bill.category)}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <span className={`icon-chip ${billCategoryTone(bill.category)}`}>
-                      <CategoryIcon size={24} aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-lg font-black text-ink">{bill.name}</p>
-                      <p className="text-sm font-medium text-neutral-600">
-                        {t(language, "due")} {formatDate(bill.occurrenceDate, language)}
-                      </p>
-                      {bill.status === "paid" && bill.paid_at ? (
-                        <p className="mt-1 text-xs font-semibold text-neutral-500">
-                          {t(language, "paidOn")} {formatDate(bill.paid_at, language)}
-                        </p>
-                      ) : null}
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
-                      <span className={`badge ${status.className}`}>
-                        <StatusIcon size={13} aria-hidden="true" />
-                        {status.label}
-                      </span>
-                      <span className="badge badge-muted">
-                        {billRecurrenceSummary(bill, language)}
-                      </span>
-                      <span className="badge badge-muted">
-                        {bill.category}
-                      </span>
+                  return (
+                    <AppListCard
+                      key={`${bill.id}:${bill.occurrenceDate}`}
+                      className={`border-l-4 p-3 ${billCategoryTone(bill.category)}`}
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span className={`icon-chip-sm ${billCategoryTone(bill.category)}`}>
+                            <CategoryIcon size={20} aria-hidden="true" />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-base font-black text-ink">{bill.name}</p>
+                            <p className="text-sm font-medium text-neutral-600">
+                              {t(language, "due")} {formatDate(bill.occurrenceDate, language)}
+                            </p>
+                            {bill.status === "paid" && bill.paid_at ? (
+                              <p className="mt-1 text-xs font-semibold text-neutral-500">
+                                {t(language, "paidOn")} {formatDate(bill.paid_at, language)}
+                              </p>
+                            ) : null}
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+                              <span className={`badge ${status.className}`}>
+                                <StatusIcon size={13} aria-hidden="true" />
+                                {status.label}
+                              </span>
+                              <span className="badge badge-muted">{billRecurrenceSummary(bill, language)}</span>
+                              <span className="badge badge-muted">{bill.category}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:items-end">
+                          <p className="text-xl font-black text-ink">{formatCurrency(bill.amount, currency)}</p>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <button className="btn-secondary min-h-10 px-3" type="button" onClick={() => toggleStatus(bill)}>
+                              <CheckCircle2 size={17} aria-hidden="true" />
+                              {bill.status === "paid" ? t(language, "markUnpaid") : t(language, "markPaid")}
+                            </button>
+                            <button className="btn-secondary min-h-10 px-3" type="button" onClick={() => editBill(bill)}>
+                              <Pencil size={17} aria-hidden="true" />
+                              {t(language, "edit")}
+                            </button>
+                            <button className="btn-danger min-h-10 px-3" type="button" onClick={() => deleteBill(bill.id)}>
+                              <Trash2 size={17} aria-hidden="true" />
+                              {t(language, "delete")}
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  <p className="text-xl font-black text-ink">{formatCurrency(bill.amount, currency)}</p>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button className="btn-secondary" type="button" onClick={() => toggleStatus(bill)}>
-                    <CheckCircle2 size={17} aria-hidden="true" />
-                    {bill.status === "paid" ? t(language, "markUnpaid") : t(language, "markPaid")}
-                  </button>
-                  <button className="btn-secondary" type="button" onClick={() => editBill(bill)}>
-                    <Pencil size={17} aria-hidden="true" />
-                    {t(language, "edit")}
-                  </button>
-                  <button className="btn-danger" type="button" onClick={() => deleteBill(bill.id)}>
-                    <Trash2 size={17} aria-hidden="true" />
-                    {t(language, "delete")}
-                  </button>
-                </div>
-              </AppListCard>
-              );
-            })
+                    </AppListCard>
+                  );
+                })}
+              </div>
+            ))
           )}
         </section>
       </div>

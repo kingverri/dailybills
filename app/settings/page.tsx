@@ -772,7 +772,7 @@ export default function SettingsPage() {
                         <WalletCards size={20} aria-hidden="true" />
                       </span>
                       <div>
-                      <p className="font-black capitalize text-ink">
+                      <p className="font-black text-ink">
                         {scheduleTypeLabel(language, schedule.schedule_type)}
                       </p>
                       <p className="text-sm font-medium text-neutral-600">{describeSchedule(schedule, language)}</p>
