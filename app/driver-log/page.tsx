@@ -5,6 +5,8 @@ import {
   CalendarDays,
   Car,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Clock3,
   ClipboardList,
@@ -69,6 +71,7 @@ import { usePersistentDraft } from "@/hooks/use-persistent-draft";
 import type { DriverLog, PaySchedule, WeeklySettlementDay, WorkLogType } from "@/types/app";
 
 type ExportFormat = "csv" | "xlsx" | "google";
+type WorkSummaryPeriodType = "month" | "custom";
 
 function dayOfWeekToSettlementDay(day?: string | null): WeeklySettlementDay | null {
   const value = day?.toLowerCase();
@@ -91,6 +94,25 @@ function workLogTypeIcon(type: WorkLogType | string | null | undefined) {
   return icons[String(type ?? "other") as keyof typeof icons] ?? BriefcaseBusiness;
 }
 
+function getWorkSummaryMonthRange(monthValue: string) {
+  const [year, month] = monthValue.split("-").map(Number);
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0);
+
+  return {
+    start,
+    end,
+    startDate: toDateInputValue(start),
+    endDate: toDateInputValue(end)
+  };
+}
+
+function addMonthsToMonthValue(monthValue: string, offset: number) {
+  const [year, month] = monthValue.split("-").map(Number);
+  const date = new Date(year, month - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export default function DriverLogPage() {
   const { user, profile, refreshProfile } = useAuth();
   const [logs, setLogs] = useState<DriverLog[]>([]);
@@ -104,6 +126,13 @@ export default function DriverLogPage() {
     resetWhenDisabled: false
   });
   const [showForm, setShowForm] = useState(false);
+  const currentMonthValue = toDateInputValue().slice(0, 7);
+  const currentMonthDefaultRange = getWorkSummaryMonthRange(currentMonthValue);
+  const [workSummaryPeriodType, setWorkSummaryPeriodType] = useState<WorkSummaryPeriodType>("month");
+  const [workSummaryMonth, setWorkSummaryMonth] = useState(currentMonthValue);
+  const [workSummaryCustomStartDate, setWorkSummaryCustomStartDate] = useState(currentMonthDefaultRange.startDate);
+  const [workSummaryCustomEndDate, setWorkSummaryCustomEndDate] = useState(currentMonthDefaultRange.endDate);
+  const [showMonthlyFullSummary, setShowMonthlyFullSummary] = useState(false);
   const [showCurrentFullSummary, setShowCurrentFullSummary] = useState(false);
   const [showPreviousFullSummary, setShowPreviousFullSummary] = useState(false);
   const [detailWeek, setDetailWeek] = useState<"current" | "previous" | null>(null);
@@ -129,25 +158,26 @@ export default function DriverLogPage() {
     previousAnchor.setDate(previousAnchor.getDate() - 1);
     return getWeekRangeBySettlementDay(previousAnchor, settlementDay);
   }, [currentWeekRange.start, settlementDay]);
-  const currentMonthRange = useMemo(() => {
-    const today = new Date();
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const workSummaryDateError = workSummaryPeriodType === "custom" && workSummaryCustomEndDate < workSummaryCustomStartDate;
+  const workSummaryRange = useMemo(() => {
+    if (workSummaryPeriodType === "custom") {
+      return {
+        start: new Date(`${workSummaryCustomStartDate}T00:00:00`),
+        end: new Date(`${workSummaryCustomEndDate}T00:00:00`),
+        startDate: workSummaryCustomStartDate,
+        endDate: workSummaryCustomEndDate
+      };
+    }
 
-    return {
-      start,
-      end,
-      startDate: toDateInputValue(start),
-      endDate: toDateInputValue(end)
-    };
-  }, []);
+    return getWorkSummaryMonthRange(workSummaryMonth);
+  }, [workSummaryCustomEndDate, workSummaryCustomStartDate, workSummaryMonth, workSummaryPeriodType]);
   const currentWeekSummary = useMemo(
     () => calculateWeeklyDriverSummaryForRange(logs, currentWeekRange),
     [currentWeekRange, logs]
   );
   const currentMonthSummary = useMemo(
-    () => calculateWeeklyDriverSummaryForRange(logs, currentMonthRange),
-    [currentMonthRange, logs]
+    () => calculateWeeklyDriverSummaryForRange(workSummaryDateError ? [] : logs, workSummaryRange),
+    [logs, workSummaryDateError, workSummaryRange]
   );
   const todayValue = toDateInputValue();
   const todayLogs = useMemo(() => logs.filter((log) => log.date === todayValue), [logs, todayValue]);
@@ -185,13 +215,14 @@ export default function DriverLogPage() {
   const selectedWeekLogs = detailWeek === "previous" ? previousWeekLogs : currentWeekLogs;
   const shouldShowMonthlyStops = useMemo(
     () =>
+      !workSummaryDateError &&
       logs.some(
         (log) =>
-          log.date >= currentMonthRange.startDate &&
-          log.date <= currentMonthRange.endDate &&
+          log.date >= workSummaryRange.startDate &&
+          log.date <= workSummaryRange.endDate &&
           (Number(log.stops_completed ?? 0) > 0 || log.platform === "OnTrac")
       ),
-    [currentMonthRange.endDate, currentMonthRange.startDate, logs]
+    [logs, workSummaryDateError, workSummaryRange.endDate, workSummaryRange.startDate]
   );
 
   async function loadData() {
@@ -425,6 +456,18 @@ export default function DriverLogPage() {
           currency={currency}
           language={language}
           showStops={shouldShowMonthlyStops}
+          periodType={workSummaryPeriodType}
+          selectedMonth={workSummaryMonth}
+          customStartDate={workSummaryCustomStartDate}
+          customEndDate={workSummaryCustomEndDate}
+          currentMonthValue={currentMonthValue}
+          dateError={workSummaryDateError}
+          showFull={showMonthlyFullSummary}
+          onToggleFull={() => setShowMonthlyFullSummary((value) => !value)}
+          onChangePeriodType={setWorkSummaryPeriodType}
+          onChangeMonth={setWorkSummaryMonth}
+          onChangeCustomStartDate={setWorkSummaryCustomStartDate}
+          onChangeCustomEndDate={setWorkSummaryCustomEndDate}
         />
 
         <WeeklySummaryCard
@@ -622,41 +665,166 @@ function MonthlyWorkSummaryCard({
   summary,
   currency,
   language,
-  showStops
+  showStops,
+  periodType,
+  selectedMonth,
+  customStartDate,
+  customEndDate,
+  currentMonthValue,
+  dateError,
+  showFull,
+  onToggleFull,
+  onChangePeriodType,
+  onChangeMonth,
+  onChangeCustomStartDate,
+  onChangeCustomEndDate
 }: {
   summary: ReturnType<typeof calculateWeeklyDriverSummaryForRange>;
   currency: string;
   language: string;
   showStops: boolean;
+  periodType: WorkSummaryPeriodType;
+  selectedMonth: string;
+  customStartDate: string;
+  customEndDate: string;
+  currentMonthValue: string;
+  dateError: boolean;
+  showFull: boolean;
+  onToggleFull: () => void;
+  onChangePeriodType: (type: WorkSummaryPeriodType) => void;
+  onChangeMonth: (month: string) => void;
+  onChangeCustomStartDate: (date: string) => void;
+  onChangeCustomEndDate: (date: string) => void;
 }) {
+  const hasRecords = summary.workDaysLogged > 0;
+
+  function moveMonth(offset: number) {
+    onChangePeriodType("month");
+    onChangeMonth(addMonthsToMonthValue(selectedMonth, offset));
+  }
+
+  function selectCurrentMonth() {
+    onChangePeriodType("month");
+    onChangeMonth(currentMonthValue);
+  }
+
   return (
     <section className="card p-5 sm:p-6">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="flex items-center gap-2 text-brand-700">
             <span className="icon-chip-sm">
               <CalendarDays size={20} aria-hidden="true" />
             </span>
-            <h2 className="text-xl font-black text-ink">{t(language, "monthlySummary")}</h2>
+            <h2 className="text-xl font-black text-ink">
+              {periodType === "custom" ? t(language, "customSummary") : t(language, "monthlySummary")}
+            </h2>
           </div>
           <p className="mt-2 text-sm font-medium text-neutral-600">
             {formatDate(summary.startDate, language)} - {formatDate(summary.endDate, language)}
           </p>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-secondary min-h-10 px-3" type="button" onClick={() => moveMonth(-1)}>
+            <ChevronLeft size={16} aria-hidden="true" />
+            {t(language, "previousMonth")}
+          </button>
+          <button className="btn-secondary min-h-10 px-3" type="button" onClick={selectCurrentMonth}>
+            {t(language, "thisMonth")}
+          </button>
+          <button className="btn-secondary min-h-10 px-3" type="button" onClick={() => moveMonth(1)}>
+            {t(language, "nextMonth")}
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3 xl:grid-cols-5">
-        <Metric icon={DollarSign} label={t(language, "monthlyGrossEarnings")} value={formatCurrency(summary.totalGrossEarnings, currency)} />
-        <Metric icon={HandCoins} label={t(language, "monthlyTips")} value={formatCurrency(summary.totalTipsReceived, currency)} />
-        <Metric icon={DollarSign} label={t(language, "totalEarnings")} value={formatCurrency(summary.totalEarnings, currency)} />
-        <Metric icon={Clock3} label={t(language, "hoursWorked")} value={formatDurationFromDecimalHours(summary.totalHoursWorked)} />
-        <Metric icon={Route} label={t(language, "miles")} value={summary.totalMiles.toFixed(1)} />
-        {showStops ? <Metric icon={MapPin} label={t(language, "stops")} value={summary.totalStopsCompleted.toFixed(0)} /> : null}
-        <Metric icon={Receipt} label={t(language, "gas")} value={formatCurrency(summary.totalGasSpent, currency)} />
-        <Metric icon={Receipt} label={t(language, "extraExpenses")} value={formatCurrency(summary.totalExtraExpenses, currency)} />
-        <Metric icon={Receipt} label={t(language, "workNetProfit")} value={formatCurrency(summary.netProfit, currency)} />
-        <Metric icon={ClipboardList} label={t(language, "daysWorked")} value={String(summary.workDaysLogged)} />
+      <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <label className="block space-y-2">
+          <span className="field-label">{t(language, "periodType")}</span>
+          <select
+            className="field"
+            value={periodType}
+            onChange={(event) => onChangePeriodType(event.target.value as WorkSummaryPeriodType)}
+          >
+            <option value="month">{t(language, "monthPeriod")}</option>
+            <option value="custom">{t(language, "customRange")}</option>
+          </select>
+        </label>
+
+        {periodType === "month" ? (
+          <label className="block space-y-2">
+            <span className="field-label">{t(language, "selectMonth")}</span>
+            <input className="field" type="month" value={selectedMonth} onChange={(event) => onChangeMonth(event.target.value)} />
+          </label>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block space-y-2">
+              <span className="field-label">{t(language, "startDate")}</span>
+              <input className="field" type="date" value={customStartDate} onChange={(event) => onChangeCustomStartDate(event.target.value)} />
+            </label>
+            <label className="block space-y-2">
+              <span className="field-label">{t(language, "endDate")}</span>
+              <input className="field" type="date" value={customEndDate} onChange={(event) => onChangeCustomEndDate(event.target.value)} />
+            </label>
+          </div>
+        )}
       </div>
+
+      {dateError ? (
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+          {t(language, "endDateMustBeAfterStartDate")}
+        </p>
+      ) : null}
+
+      {!dateError && !hasRecords ? (
+        <div className="rounded-2xl border border-dashed border-line bg-neutral-50 p-4">
+          <p className="text-sm font-black text-ink">{t(language, "noWorkLoggedInPeriod")}</p>
+          <p className="mt-1 text-sm font-medium text-neutral-600">{t(language, "logWorkOrChooseAnotherPeriod")}</p>
+        </div>
+      ) : null}
+
+      {!dateError && hasRecords ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3 xl:grid-cols-5">
+            <Metric icon={DollarSign} label={t(language, "monthlyGrossEarnings")} value={formatCurrency(summary.totalGrossEarnings, currency)} />
+            <Metric icon={HandCoins} label={t(language, "monthlyTips")} value={formatCurrency(summary.totalTipsReceived, currency)} />
+            <Metric icon={DollarSign} label={t(language, "totalEarnings")} value={formatCurrency(summary.totalEarnings, currency)} />
+            <Metric icon={Clock3} label={t(language, "hoursWorked")} value={formatDurationFromDecimalHours(summary.totalHoursWorked)} />
+            <Metric icon={Route} label={t(language, "miles")} value={summary.totalMiles.toFixed(1)} />
+            {showStops ? <Metric icon={MapPin} label={t(language, "stops")} value={summary.totalStopsCompleted.toFixed(0)} /> : null}
+            <Metric icon={Receipt} label={t(language, "gas")} value={formatCurrency(summary.totalGasSpent, currency)} />
+            <Metric icon={Receipt} label={t(language, "extraExpenses")} value={formatCurrency(summary.totalExtraExpenses, currency)} />
+            <Metric icon={Receipt} label={t(language, "workNetProfit")} value={formatCurrency(summary.netProfit, currency)} />
+            <Metric icon={ClipboardList} label={t(language, "daysWorked")} value={String(summary.workDaysLogged)} />
+          </div>
+
+          <div className="mt-4 border-t border-line pt-3">
+            <button className="flex w-full items-center justify-between gap-3 text-left text-sm font-semibold text-brand-700" type="button" onClick={onToggleFull}>
+              <span>{showFull ? t(language, "hideFullSummary") : t(language, "showFullSummary")}</span>
+              {showFull ? <ChevronUp size={17} aria-hidden="true" /> : <ChevronDown size={17} aria-hidden="true" />}
+            </button>
+            {showFull ? (
+              <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                <Metric icon={Receipt} label={t(language, "totalGasSpent")} value={formatCurrency(summary.totalGasSpent, currency)} />
+                <Metric icon={DollarSign} label={t(language, "averageGasPrice")} value={formatCurrency(summary.averageGasPricePaid, currency)} />
+                <Metric icon={Route} label={t(language, "gallonsBought")} value={summary.totalGallonsBought.toFixed(2)} />
+                <Metric icon={Clock3} label={t(language, "grossPerHour")} value={formatHourlyRate(summary.grossPerHour, currency, language)} />
+                <Metric icon={Clock3} label={t(language, "netPerHour")} value={formatHourlyRate(summary.netPerHour, currency, language)} />
+                <Metric icon={Route} label={t(language, "grossPerMile")} value={formatCurrency(summary.grossPerMile, currency)} />
+                <Metric icon={Route} label={t(language, "netPerMile")} value={formatCurrency(summary.netPerMile, currency)} />
+                {showStops ? (
+                  <>
+                    <Metric icon={MapPin} label={t(language, "totalStops")} value={summary.totalStopsCompleted.toFixed(0)} />
+                    <Metric icon={MapPin} label={t(language, "grossPerStop")} value={formatCurrency(summary.grossPerStop, currency)} />
+                    <Metric icon={MapPin} label={t(language, "netPerStop")} value={formatCurrency(summary.netPerStop, currency)} />
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </>
+      ) : null}
     </section>
   );
 }
