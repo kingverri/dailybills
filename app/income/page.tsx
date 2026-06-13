@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -44,6 +45,12 @@ type IncomeForm = {
 
 type IncomeFilter = "all" | "actual" | "confirmed" | "extra_gig";
 type ExportFormat = "csv" | "xlsx" | "google";
+type WeeklyReceivedTotal = {
+  label: string;
+  startDate: string;
+  endDate: string;
+  total: number;
+};
 
 type MonthRange = {
   startDate: string;
@@ -100,6 +107,68 @@ function incomeTypeBadgeClass(type: IncomeEntryType) {
   return "badge-good";
 }
 
+function getPaymentDisplayType(entry: DailyIncomeEntry, todayValue: string): IncomeEntryType {
+  if (entry.income_entry_type === "confirmed" && entry.date <= todayValue) {
+    return "actual";
+  }
+
+  return entry.income_entry_type ?? "actual";
+}
+
+function isReceivedPayment(entry: DailyIncomeEntry, todayValue: string) {
+  const displayType = getPaymentDisplayType(entry, todayValue);
+  return displayType === "actual" || displayType === "extra_gig";
+}
+
+function paymentStatusLabel(language: string, type: IncomeEntryType) {
+  if (type === "confirmed") {
+    return t(language, "futurePaymentConfirmed");
+  }
+
+  if (type === "extra_gig") {
+    return incomeEntryTypeLabel(language, type);
+  }
+
+  return t(language, "receivedPayment");
+}
+
+function buildWeeklyReceivedTotals(monthValue: string, entries: DailyIncomeEntry[], todayValue: string): WeeklyReceivedTotal[] {
+  const [year, month] = monthValue.split("-").map(Number);
+  const monthStart = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 0);
+  const weeks: WeeklyReceivedTotal[] = [];
+  let cursor = new Date(monthStart);
+  let index = 1;
+
+  while (cursor <= monthEnd) {
+    const weekStart = new Date(cursor);
+    const weekEnd = new Date(cursor);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    if (weekEnd > monthEnd) {
+      weekEnd.setTime(monthEnd.getTime());
+    }
+
+    const startDate = toDateInputValue(weekStart);
+    const endDate = toDateInputValue(weekEnd);
+    const total = entries
+      .filter((entry) => entry.date >= startDate && entry.date <= endDate && isReceivedPayment(entry, todayValue))
+      .reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0);
+
+    weeks.push({
+      label: String(index),
+      startDate,
+      endDate,
+      total
+    });
+
+    cursor = new Date(weekEnd);
+    cursor.setDate(cursor.getDate() + 1);
+    index += 1;
+  }
+
+  return weeks;
+}
+
 export default function IncomePage() {
   const { user, profile } = useAuth();
   const [entries, setEntries] = useState<DailyIncomeEntry[]>([]);
@@ -136,6 +205,7 @@ export default function IncomePage() {
     [gross, hours, miles, netProfit]
   );
   const currentMonthValue = toDateInputValue().slice(0, 7);
+  const todayValue = toDateInputValue();
   const selectedMonthRange = useMemo(() => getMonthRange(selectedMonth), [selectedMonth]);
   const monthlyEntries = useMemo(
     () =>
@@ -145,24 +215,29 @@ export default function IncomePage() {
     [entries, selectedMonthRange.endExclusive, selectedMonthRange.startDate]
   );
   const filteredEntries = useMemo(
-    () => monthlyEntries.filter((entry) => filter === "all" || entry.income_entry_type === filter),
-    [filter, monthlyEntries]
+    () => monthlyEntries.filter((entry) => filter === "all" || getPaymentDisplayType(entry, todayValue) === filter),
+    [filter, monthlyEntries, todayValue]
   );
   const paymentSummary = useMemo(() => {
-    const confirmedEntries = monthlyEntries.filter((entry) => entry.income_entry_type === "confirmed");
-    const nextConfirmed = [...confirmedEntries].sort((first, second) => first.date.localeCompare(second.date))[0];
+    const futureEntries = monthlyEntries.filter((entry) => getPaymentDisplayType(entry, todayValue) === "confirmed");
+    const nextConfirmed = [...futureEntries].sort((first, second) => first.date.localeCompare(second.date))[0];
 
     return {
       received: monthlyEntries
-        .filter((entry) => entry.income_entry_type === "actual")
+        .filter((entry) => isReceivedPayment(entry, todayValue))
         .reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0),
-      pending: confirmedEntries.reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0),
+      pending: futureEntries.reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0),
       extras: monthlyEntries
         .filter((entry) => entry.income_entry_type === "extra_gig")
         .reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0),
-      nextPayment: nextConfirmed
+      nextPayment: nextConfirmed,
+      count: monthlyEntries.length
     };
-  }, [monthlyEntries]);
+  }, [monthlyEntries, todayValue]);
+  const weeklyReceivedTotals = useMemo(
+    () => buildWeeklyReceivedTotals(selectedMonth, monthlyEntries, todayValue),
+    [monthlyEntries, selectedMonth, todayValue]
+  );
 
   async function loadData() {
     if (!user) {
@@ -323,6 +398,7 @@ export default function IncomePage() {
         <section className="card space-y-4 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="space-y-2">
+              <h2 className="text-xl font-black text-ink">{t(language, "monthlySummary")}</h2>
               <p className="field-label">{t(language, "selectedMonth")}</p>
               <p className="text-2xl font-black text-ink">{formatSelectedMonth(selectedMonth, language)}</p>
             </div>
@@ -361,9 +437,9 @@ export default function IncomePage() {
               }}
             />
           </label>
-          <div className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3 xl:grid-cols-5">
             <AppMetricCard compact icon={DollarSign} label={t(language, "receivedThisMonth")} value={formatCurrency(paymentSummary.received, currency)} tone="green" />
-            <AppMetricCard compact icon={Clock3} label={t(language, "pendingPayments")} value={formatCurrency(paymentSummary.pending, currency)} tone="amber" />
+            <AppMetricCard compact icon={Clock3} label={t(language, "pendingFuturePayments")} value={formatCurrency(paymentSummary.pending, currency)} tone="amber" />
             <AppMetricCard
               compact
               icon={BarChart3}
@@ -372,8 +448,28 @@ export default function IncomePage() {
               tone="cyan"
             />
             <AppMetricCard compact icon={TrendingUp} label={t(language, "extraIncomeFilter")} value={formatCurrency(paymentSummary.extras, currency)} tone="purple" />
+            <AppMetricCard compact icon={BarChart3} label={t(language, "paymentCount")} value={String(paymentSummary.count)} />
           </div>
         </section>
+
+        <AppSectionCard icon={CalendarDays} title={t(language, "receivedByWeek")} subtitle={formatSelectedMonth(selectedMonth, language)}>
+          <div className="space-y-2">
+            {weeklyReceivedTotals.map((week) => (
+              <div
+                key={`${week.startDate}-${week.endDate}`}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-neutral-50 px-3 py-2.5"
+              >
+                <div>
+                  <p className="text-sm font-black text-ink">{t(language, "weekNumber", { number: week.label })}</p>
+                  <p className="text-xs font-semibold text-neutral-500">
+                    {formatDate(week.startDate, language)} - {formatDate(week.endDate, language)}
+                  </p>
+                </div>
+                <p className="text-base font-black text-ink">{formatCurrency(week.total, currency)}</p>
+              </div>
+            ))}
+          </div>
+        </AppSectionCard>
 
         <AppSectionCard
           icon={BarChart3}
@@ -542,12 +638,13 @@ export default function IncomePage() {
           ) : (
             filteredEntries.map((entry) => {
               const expanded = expandedEntries.includes(entry.id);
+              const displayType = getPaymentDisplayType(entry, todayValue);
 
               return (
               <AppListCard key={entry.id}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-start gap-3">
-                    <span className={`icon-chip-sm ${incomeTypeBadgeClass(entry.income_entry_type)}`}>
+                    <span className={`icon-chip-sm ${incomeTypeBadgeClass(displayType)}`}>
                       <DollarSign size={18} aria-hidden="true" />
                     </span>
                     <div className="min-w-0">
@@ -555,8 +652,8 @@ export default function IncomePage() {
                     <p className="text-sm font-medium text-neutral-600">
                       {formatDate(entry.date, language)}
                     </p>
-                    <span className={`badge mt-2 ${incomeTypeBadgeClass(entry.income_entry_type)}`}>
-                      {incomeEntryTypeLabel(language, entry.income_entry_type)}
+                    <span className={`badge mt-2 ${incomeTypeBadgeClass(displayType)}`}>
+                      {paymentStatusLabel(language, displayType)}
                     </span>
                     </div>
                   </div>

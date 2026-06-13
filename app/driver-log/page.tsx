@@ -129,9 +129,25 @@ export default function DriverLogPage() {
     previousAnchor.setDate(previousAnchor.getDate() - 1);
     return getWeekRangeBySettlementDay(previousAnchor, settlementDay);
   }, [currentWeekRange.start, settlementDay]);
+  const currentMonthRange = useMemo(() => {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    return {
+      start,
+      end,
+      startDate: toDateInputValue(start),
+      endDate: toDateInputValue(end)
+    };
+  }, []);
   const currentWeekSummary = useMemo(
     () => calculateWeeklyDriverSummaryForRange(logs, currentWeekRange),
     [currentWeekRange, logs]
+  );
+  const currentMonthSummary = useMemo(
+    () => calculateWeeklyDriverSummaryForRange(logs, currentMonthRange),
+    [currentMonthRange, logs]
   );
   const todayValue = toDateInputValue();
   const todayLogs = useMemo(() => logs.filter((log) => log.date === todayValue), [logs, todayValue]);
@@ -167,6 +183,16 @@ export default function DriverLogPage() {
     [previousWeekRange.endDate, previousWeekRange.startDate, logs]
   );
   const selectedWeekLogs = detailWeek === "previous" ? previousWeekLogs : currentWeekLogs;
+  const shouldShowMonthlyStops = useMemo(
+    () =>
+      logs.some(
+        (log) =>
+          log.date >= currentMonthRange.startDate &&
+          log.date <= currentMonthRange.endDate &&
+          (Number(log.stops_completed ?? 0) > 0 || log.platform === "OnTrac")
+      ),
+    [currentMonthRange.endDate, currentMonthRange.startDate, logs]
+  );
 
   async function loadData() {
     if (!user) {
@@ -394,6 +420,13 @@ export default function DriverLogPage() {
           </div>
         </section>
 
+        <MonthlyWorkSummaryCard
+          summary={currentMonthSummary}
+          currency={currency}
+          language={language}
+          showStops={shouldShowMonthlyStops}
+        />
+
         <WeeklySummaryCard
           title={t(language, "currentWeekSummary")}
           summary={currentWeekSummary}
@@ -547,7 +580,7 @@ function WeeklySummaryCard({
           {viewDetailsLabel}
         </button>
       </div>
-      <div className="grid auto-cols-[minmax(135px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-1 text-sm sm:grid-flow-row sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3 xl:grid-cols-6">
         <Metric icon={DollarSign} label={t(language, "totalGrossEarnings")} value={formatCurrency(summary.totalGrossEarnings, currency)} />
         <Metric icon={HandCoins} label={t(language, "totalTips")} value={formatCurrency(summary.totalTipsReceived, currency)} />
         <Metric icon={DollarSign} label={t(language, "totalEarnings")} value={formatCurrency(summary.totalEarnings, currency)} />
@@ -561,7 +594,7 @@ function WeeklySummaryCard({
           {showFull ? <ChevronUp size={17} aria-hidden="true" /> : <ChevronDown size={17} aria-hidden="true" />}
         </button>
         {showFull ? (
-          <div className="mt-3 grid auto-cols-[minmax(135px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-1 text-sm sm:grid-flow-row sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
             <Metric icon={Route} label={t(language, "totalMiles")} value={summary.totalMiles.toFixed(1)} />
             <Metric icon={Receipt} label={t(language, "totalGasSpent")} value={formatCurrency(summary.totalGasSpent, currency)} />
             <Metric icon={DollarSign} label={t(language, "averageGasPrice")} value={formatCurrency(summary.averageGasPricePaid, currency)} />
@@ -580,6 +613,49 @@ function WeeklySummaryCard({
             ) : null}
           </div>
         ) : null}
+      </div>
+    </section>
+  );
+}
+
+function MonthlyWorkSummaryCard({
+  summary,
+  currency,
+  language,
+  showStops
+}: {
+  summary: ReturnType<typeof calculateWeeklyDriverSummaryForRange>;
+  currency: string;
+  language: string;
+  showStops: boolean;
+}) {
+  return (
+    <section className="card p-5 sm:p-6">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-brand-700">
+            <span className="icon-chip-sm">
+              <CalendarDays size={20} aria-hidden="true" />
+            </span>
+            <h2 className="text-xl font-black text-ink">{t(language, "monthlySummary")}</h2>
+          </div>
+          <p className="mt-2 text-sm font-medium text-neutral-600">
+            {formatDate(summary.startDate, language)} - {formatDate(summary.endDate, language)}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3 xl:grid-cols-5">
+        <Metric icon={DollarSign} label={t(language, "monthlyGrossEarnings")} value={formatCurrency(summary.totalGrossEarnings, currency)} />
+        <Metric icon={HandCoins} label={t(language, "monthlyTips")} value={formatCurrency(summary.totalTipsReceived, currency)} />
+        <Metric icon={DollarSign} label={t(language, "totalEarnings")} value={formatCurrency(summary.totalEarnings, currency)} />
+        <Metric icon={Clock3} label={t(language, "hoursWorked")} value={formatDurationFromDecimalHours(summary.totalHoursWorked)} />
+        <Metric icon={Route} label={t(language, "miles")} value={summary.totalMiles.toFixed(1)} />
+        {showStops ? <Metric icon={MapPin} label={t(language, "stops")} value={summary.totalStopsCompleted.toFixed(0)} /> : null}
+        <Metric icon={Receipt} label={t(language, "gas")} value={formatCurrency(summary.totalGasSpent, currency)} />
+        <Metric icon={Receipt} label={t(language, "extraExpenses")} value={formatCurrency(summary.totalExtraExpenses, currency)} />
+        <Metric icon={Receipt} label={t(language, "workNetProfit")} value={formatCurrency(summary.netProfit, currency)} />
+        <Metric icon={ClipboardList} label={t(language, "daysWorked")} value={String(summary.workDaysLogged)} />
       </div>
     </section>
   );
