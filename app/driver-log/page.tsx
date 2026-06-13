@@ -714,7 +714,13 @@ function MonthlyWorkSummaryCard({
   onChangeCustomEndDate: (date: string) => void;
 }) {
   const hasRecords = summary.workDaysLogged > 0 || paymentSummary.count > 0;
-  const workNetProfit = paymentSummary.confirmedEarnings - summary.totalGasSpent - summary.totalExtraExpenses;
+  const workNetProfit = paymentSummary.received - summary.totalGasSpent - summary.totalExtraExpenses;
+  const receivedPerHour = summary.totalHoursWorked > 0 ? paymentSummary.received / summary.totalHoursWorked : 0;
+  const profitPerHour = summary.totalHoursWorked > 0 ? workNetProfit / summary.totalHoursWorked : 0;
+  const receivedPerMile = summary.totalMiles > 0 ? paymentSummary.received / summary.totalMiles : 0;
+  const profitPerMile = summary.totalMiles > 0 ? workNetProfit / summary.totalMiles : 0;
+  const receivedPerStop = summary.totalStopsCompleted > 0 ? paymentSummary.received / summary.totalStopsCompleted : 0;
+  const profitPerStop = summary.totalStopsCompleted > 0 ? workNetProfit / summary.totalStopsCompleted : 0;
 
   function moveMonth(offset: number) {
     onChangePeriodType("month");
@@ -827,15 +833,15 @@ function MonthlyWorkSummaryCard({
                 <Metric icon={Clock3} label={t(language, "pendingFuturePayments")} value={formatCurrency(paymentSummary.pending, currency)} />
                 <Metric icon={DollarSign} label={t(language, "averageGasPrice")} value={formatCurrency(summary.averageGasPricePaid, currency)} />
                 <Metric icon={Route} label={t(language, "gallonsBought")} value={summary.totalGallonsBought.toFixed(2)} />
-                <Metric icon={Clock3} label={t(language, "grossPerHour")} value={formatHourlyRate(summary.grossPerHour, currency, language)} />
-                <Metric icon={Clock3} label={t(language, "netPerHour")} value={formatHourlyRate(summary.netPerHour, currency, language)} />
-                <Metric icon={Route} label={t(language, "grossPerMile")} value={formatCurrency(summary.grossPerMile, currency)} />
-                <Metric icon={Route} label={t(language, "netPerMile")} value={formatCurrency(summary.netPerMile, currency)} />
+                <Metric icon={Clock3} label={t(language, "receivedPerHour")} value={formatHourlyRate(receivedPerHour, currency, language)} />
+                <Metric icon={Clock3} label={t(language, "profitPerHour")} value={formatHourlyRate(profitPerHour, currency, language)} />
+                <Metric icon={Route} label={t(language, "receivedPerMile")} value={formatCurrency(receivedPerMile, currency)} />
+                <Metric icon={Route} label={t(language, "profitPerMile")} value={formatCurrency(profitPerMile, currency)} />
                 {showStops ? (
                   <>
                     <Metric icon={MapPin} label={t(language, "totalStops")} value={summary.totalStopsCompleted.toFixed(0)} />
-                    <Metric icon={MapPin} label={t(language, "grossPerStop")} value={formatCurrency(summary.grossPerStop, currency)} />
-                    <Metric icon={MapPin} label={t(language, "netPerStop")} value={formatCurrency(summary.netPerStop, currency)} />
+                    <Metric icon={MapPin} label={t(language, "receivedPerStop")} value={formatCurrency(receivedPerStop, currency)} />
+                    <Metric icon={MapPin} label={t(language, "profitPerStop")} value={formatCurrency(profitPerStop, currency)} />
                   </>
                 ) : null}
               </div>
