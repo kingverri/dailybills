@@ -29,6 +29,7 @@ import {
 import { buildIncomeExportRows, exportToCSV, exportToXLSX } from "@/lib/exportUtils";
 import { formatCurrency, formatDate, formatDurationFromDecimalHours, toDateInputValue } from "@/lib/format";
 import { incomeEntryTypeLabel, t } from "@/lib/i18n";
+import { calculatePaymentSummaryForPeriod, getPaymentDisplayType, isReceivedPayment } from "@/lib/paymentCalculations";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { DailyIncomeEntry, IncomeEntryType, Platform, Vehicle } from "@/types/app";
 
@@ -85,6 +86,11 @@ function addMonthsToMonthValue(monthValue: string, offset: number) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function getMonthEndDate(monthValue: string) {
+  const [year, month] = monthValue.split("-").map(Number);
+  return toDateInputValue(new Date(year, month, 0));
+}
+
 function formatSelectedMonth(monthValue: string, language: string) {
   const [year, month] = monthValue.split("-").map(Number);
   const locale = language === "pt" ? "pt-BR" : language === "es" ? "es-ES" : "en-US";
@@ -105,19 +111,6 @@ function incomeTypeBadgeClass(type: IncomeEntryType) {
   }
 
   return "badge-good";
-}
-
-function getPaymentDisplayType(entry: DailyIncomeEntry, todayValue: string): IncomeEntryType {
-  if (entry.income_entry_type === "confirmed" && entry.date <= todayValue) {
-    return "actual";
-  }
-
-  return entry.income_entry_type ?? "actual";
-}
-
-function isReceivedPayment(entry: DailyIncomeEntry, todayValue: string) {
-  const displayType = getPaymentDisplayType(entry, todayValue);
-  return displayType === "actual" || displayType === "extra_gig";
 }
 
 function paymentStatusLabel(language: string, type: IncomeEntryType) {
@@ -219,21 +212,9 @@ export default function IncomePage() {
     [filter, monthlyEntries, todayValue]
   );
   const paymentSummary = useMemo(() => {
-    const futureEntries = monthlyEntries.filter((entry) => getPaymentDisplayType(entry, todayValue) === "confirmed");
-    const nextConfirmed = [...futureEntries].sort((first, second) => first.date.localeCompare(second.date))[0];
-
-    return {
-      received: monthlyEntries
-        .filter((entry) => isReceivedPayment(entry, todayValue))
-        .reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0),
-      pending: futureEntries.reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0),
-      extras: monthlyEntries
-        .filter((entry) => entry.income_entry_type === "extra_gig")
-        .reduce((sum, entry) => sum + Number(entry.gross_earnings ?? 0), 0),
-      nextPayment: nextConfirmed,
-      count: monthlyEntries.length
-    };
-  }, [monthlyEntries, todayValue]);
+    const endDate = getMonthEndDate(selectedMonth);
+    return calculatePaymentSummaryForPeriod(monthlyEntries, selectedMonthRange.startDate, endDate, todayValue);
+  }, [monthlyEntries, selectedMonth, selectedMonthRange.startDate, todayValue]);
   const weeklyReceivedTotals = useMemo(
     () => buildWeeklyReceivedTotals(selectedMonth, monthlyEntries, todayValue),
     [monthlyEntries, selectedMonth, todayValue]

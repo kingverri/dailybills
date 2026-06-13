@@ -58,6 +58,7 @@ import {
   toDateInputValue
 } from "@/lib/format";
 import { settlementDayLabel, t, workLogTypeLabel } from "@/lib/i18n";
+import { calculatePaymentSummaryForPeriod } from "@/lib/paymentCalculations";
 import {
   canAddDriverLog,
   canUseWeeklyHistory,
@@ -68,7 +69,7 @@ import {
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAuth } from "@/components/auth-provider";
 import { usePersistentDraft } from "@/hooks/use-persistent-draft";
-import type { DriverLog, PaySchedule, WeeklySettlementDay, WorkLogType } from "@/types/app";
+import type { DailyIncomeEntry, DriverLog, PaySchedule, WeeklySettlementDay, WorkLogType } from "@/types/app";
 
 type ExportFormat = "csv" | "xlsx" | "google";
 type WorkSummaryPeriodType = "month" | "custom";
@@ -116,6 +117,7 @@ function addMonthsToMonthValue(monthValue: string, offset: number) {
 export default function DriverLogPage() {
   const { user, profile, refreshProfile } = useAuth();
   const [logs, setLogs] = useState<DriverLog[]>([]);
+  const [paymentEntries, setPaymentEntries] = useState<DailyIncomeEntry[]>([]);
   const [paySchedules, setPaySchedules] = useState<PaySchedule[]>([]);
   const [settlementDay, setSettlementDay] = useState<WeeklySettlementDay>("friday");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -153,6 +155,7 @@ export default function DriverLogPage() {
   const canChangeSettlementDay = canUseWeeklySettlement(currentPlan);
   const canViewWeeklyHistory = canUseWeeklyHistory(currentPlan);
   const currentWeekRange = useMemo(() => getWeekRangeBySettlementDay(new Date(), settlementDay), [settlementDay]);
+  const todayValue = toDateInputValue();
   const previousWeekRange = useMemo(() => {
     const previousAnchor = new Date(currentWeekRange.start);
     previousAnchor.setDate(previousAnchor.getDate() - 1);
@@ -179,7 +182,16 @@ export default function DriverLogPage() {
     () => calculateWeeklyDriverSummaryForRange(workSummaryDateError ? [] : logs, workSummaryRange),
     [logs, workSummaryDateError, workSummaryRange]
   );
-  const todayValue = toDateInputValue();
+  const monthlyPaymentSummary = useMemo(
+    () =>
+      calculatePaymentSummaryForPeriod(
+        workSummaryDateError ? [] : paymentEntries,
+        workSummaryRange.startDate,
+        workSummaryRange.endDate,
+        todayValue
+      ),
+    [paymentEntries, todayValue, workSummaryDateError, workSummaryRange.endDate, workSummaryRange.startDate]
+  );
   const todayLogs = useMemo(() => logs.filter((log) => log.date === todayValue), [logs, todayValue]);
   const todaySummary = useMemo(
     () =>
@@ -232,16 +244,18 @@ export default function DriverLogPage() {
 
     setLoading(true);
     const supabase = getSupabaseClient();
-    const [logResult, scheduleResult] = await Promise.all([
+    const [logResult, scheduleResult, paymentResult] = await Promise.all([
       supabase.from("driver_logs").select("*").eq("user_id", user.id).order("date", { ascending: false }),
-      supabase.from("pay_schedules").select("*").eq("user_id", user.id).order("created_at", { ascending: false })
+      supabase.from("pay_schedules").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("daily_income_entries").select("*").eq("user_id", user.id).order("date", { ascending: false })
     ]);
 
-    if (logResult.error || scheduleResult.error) {
-      setError(logResult.error?.message ?? scheduleResult.error?.message ?? "");
+    if (logResult.error || scheduleResult.error || paymentResult.error) {
+      setError(logResult.error?.message ?? scheduleResult.error?.message ?? paymentResult.error?.message ?? "");
     } else {
       setLogs(logResult.data ?? []);
       setPaySchedules(scheduleResult.data ?? []);
+      setPaymentEntries(paymentResult.data ?? []);
     }
     setLoading(false);
   }
@@ -453,6 +467,7 @@ export default function DriverLogPage() {
 
         <MonthlyWorkSummaryCard
           summary={currentMonthSummary}
+          paymentSummary={monthlyPaymentSummary}
           currency={currency}
           language={language}
           showStops={shouldShowMonthlyStops}
@@ -663,6 +678,7 @@ function WeeklySummaryCard({
 
 function MonthlyWorkSummaryCard({
   summary,
+  paymentSummary,
   currency,
   language,
   showStops,
@@ -680,6 +696,7 @@ function MonthlyWorkSummaryCard({
   onChangeCustomEndDate
 }: {
   summary: ReturnType<typeof calculateWeeklyDriverSummaryForRange>;
+  paymentSummary: ReturnType<typeof calculatePaymentSummaryForPeriod>;
   currency: string;
   language: string;
   showStops: boolean;
@@ -696,7 +713,8 @@ function MonthlyWorkSummaryCard({
   onChangeCustomStartDate: (date: string) => void;
   onChangeCustomEndDate: (date: string) => void;
 }) {
-  const hasRecords = summary.workDaysLogged > 0;
+  const hasRecords = summary.workDaysLogged > 0 || paymentSummary.count > 0;
+  const workNetProfit = paymentSummary.confirmedEarnings - summary.totalGasSpent - summary.totalExtraExpenses;
 
   function moveMonth(offset: number) {
     onChangePeriodType("month");
@@ -779,7 +797,7 @@ function MonthlyWorkSummaryCard({
 
       {!dateError && !hasRecords ? (
         <div className="rounded-2xl border border-dashed border-line bg-neutral-50 p-4">
-          <p className="text-sm font-black text-ink">{t(language, "noWorkLoggedInPeriod")}</p>
+          <p className="text-sm font-black text-ink">{t(language, "noWorkOrPaymentsFoundInPeriod")}</p>
           <p className="mt-1 text-sm font-medium text-neutral-600">{t(language, "logWorkOrChooseAnotherPeriod")}</p>
         </div>
       ) : null}
@@ -787,15 +805,14 @@ function MonthlyWorkSummaryCard({
       {!dateError && hasRecords ? (
         <>
           <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-3 xl:grid-cols-5">
-            <Metric icon={DollarSign} label={t(language, "monthlyGrossEarnings")} value={formatCurrency(summary.totalGrossEarnings, currency)} />
-            <Metric icon={HandCoins} label={t(language, "monthlyTips")} value={formatCurrency(summary.totalTipsReceived, currency)} />
-            <Metric icon={DollarSign} label={t(language, "totalEarnings")} value={formatCurrency(summary.totalEarnings, currency)} />
+            <Metric icon={DollarSign} label={t(language, "receivedInPeriod")} value={formatCurrency(paymentSummary.received, currency)} />
+            <Metric icon={HandCoins} label={t(language, "confirmedEarnings")} value={formatCurrency(paymentSummary.confirmedEarnings, currency)} />
             <Metric icon={Clock3} label={t(language, "hoursWorked")} value={formatDurationFromDecimalHours(summary.totalHoursWorked)} />
             <Metric icon={Route} label={t(language, "miles")} value={summary.totalMiles.toFixed(1)} />
             {showStops ? <Metric icon={MapPin} label={t(language, "stops")} value={summary.totalStopsCompleted.toFixed(0)} /> : null}
             <Metric icon={Receipt} label={t(language, "gas")} value={formatCurrency(summary.totalGasSpent, currency)} />
-            <Metric icon={Receipt} label={t(language, "extraExpenses")} value={formatCurrency(summary.totalExtraExpenses, currency)} />
-            <Metric icon={Receipt} label={t(language, "workNetProfit")} value={formatCurrency(summary.netProfit, currency)} />
+            <Metric icon={Receipt} label={t(language, "workExpenses")} value={formatCurrency(summary.totalExtraExpenses, currency)} />
+            <Metric icon={Receipt} label={t(language, "workNetProfit")} value={formatCurrency(workNetProfit, currency)} />
             <Metric icon={ClipboardList} label={t(language, "daysWorked")} value={String(summary.workDaysLogged)} />
           </div>
 
@@ -807,6 +824,7 @@ function MonthlyWorkSummaryCard({
             {showFull ? (
               <div className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
                 <Metric icon={Receipt} label={t(language, "totalGasSpent")} value={formatCurrency(summary.totalGasSpent, currency)} />
+                <Metric icon={Clock3} label={t(language, "pendingFuturePayments")} value={formatCurrency(paymentSummary.pending, currency)} />
                 <Metric icon={DollarSign} label={t(language, "averageGasPrice")} value={formatCurrency(summary.averageGasPricePaid, currency)} />
                 <Metric icon={Route} label={t(language, "gallonsBought")} value={summary.totalGallonsBought.toFixed(2)} />
                 <Metric icon={Clock3} label={t(language, "grossPerHour")} value={formatHourlyRate(summary.grossPerHour, currency, language)} />
